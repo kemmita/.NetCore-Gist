@@ -1,0 +1,2 @@
+I am in the cli, not visual stuido but vs code
+run dotnet ef migrations remove

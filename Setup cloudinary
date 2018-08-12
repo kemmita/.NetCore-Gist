@@ -1,0 +1,200 @@
+1. forst go into appsettings.json, all of the data below can be found on https://cloudinary.com/console/welcome
+ "CloudinarySettings": {
+      "CloudName": "russelldatingapp",
+      "ApiKey": "364954642878872",
+      "ApiSecret": "IjhaK3xsus6o4F7A1rETA6Kpv5o"
+    }
+ 
+ 2.then in your Helpers folder create a new class
+ namespace DatingApp.API.Helpers
+{
+    public class CloudinarySettings
+    {
+        public string CloudName { get; set; }
+        public string ApiKey { get; set; }
+        public string ApiSecret { get; set; }
+    }
+}
+
+3.then go to stratup.cs
+ services.AddCors();
+ services.Configure<CloudinarySettings>(Configuration.GetSection("CloudinarySettings"));
+  
+
+4.then in your Photo Model add a new column 
+**Original Photo Model****
+using System;
+
+namespace DatingApp.API.models
+{
+    public class Photo
+    {
+        public int Id { get; set; }
+        public string Url { get; set; }
+        public string Description { get; set; }
+        public DateTime DateAdded { get; set; }
+        public bool IsMain { get; set; }
+        //here we create a user column that references the user table, we then create a UserId to act as a foreign key
+        public User User { get; set; }
+        public int UserId { get; set; }
+    }
+}
+
+
+
+**END Original Photo Model
+
+// PublicId is used to store the public id we get from cloudinary
+        public string PublicId { get; set; }
+
+5.Then create a migration and update database
+
+6.Then using nuget PM we will add a package 
+hit ctrl p and then enter >Nuget Package Manager: Add Package
+then type Cloudinarydotnet
+then select CloudinaryDotNet
+then select the newest version 
+then in terminal run dotnet restore 
+
+7.We will now need to alter our Repositroy Interface
+Task<Photo> GetPhoto(int Id);
+
+8. now create the method in the actual repo
+  public Task<Photo> GetPhoto(int Id){
+      var photo = _context.Photos.FirstOrDefaultAsync(p => p.Id == Id);
+      return photo;
+    }
+
+9. Now create a PhotoForCreationDto
+using System;
+using Microsoft.AspNetCore.Http;
+
+namespace DatingApp.API.Dtos
+{
+    public class PhotoForCreationDto
+    {
+        public string Url { get; set; }
+        public IFormFile File { get; set; }
+        public string Description { get; set; }
+        public DateTime DateAdded { get; set; }
+        public string PublicId { get; set; }
+
+        public PhotoForCreationDto(){
+            DateAdded = DateTime.Now;
+        }
+    }
+}
+
+10. Now create a PhotoForReturnDto
+using System;
+
+namespace DatingApp.API.Dtos
+{
+    public class PhotoForReturnDto
+    {
+        
+        public int Id { get; set; }
+        public string Url { get; set; }
+        public string Description { get; set; }
+        public DateTime DateAdded { get; set; }
+        public bool IsMain { get; set; }
+        
+        // PublicId is used to store the public id we get from cloudinary
+        public string PublicId { get; set; }
+    }
+}
+
+11.in the Automapper file add the new maps
+ //Post
+            CreateMap<PhotoForCreationDto, Photo>();
+
+            //Get
+            CreateMap<Photo, PhotoForReturnDto>();
+            
+  
+  12. now Create the Photos Controller
+  using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using AutoMapper;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using DatingApp.API.data;
+using DatingApp.API.Dtos;
+using DatingApp.API.Helpers;
+using DatingApp.API.models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+
+namespace DatingApp.API.Controllers
+{
+    [Authorize]
+    [Route("api/users/{userId}/photos")]    public class PhotosController: Controller
+    {
+        private readonly IDatingRepository _repo;
+        private readonly IMapper _mapper;
+        private readonly IOptions<CloudinarySettings> _cloudinaryConfig;
+        private Cloudinary _cloudinary;
+        public PhotosController(IDatingRepository repo, IMapper mapper, IOptions<CloudinarySettings> cloudinaryConfig)
+        {
+            _repo = repo;   
+            _mapper = mapper;
+            _cloudinaryConfig = cloudinaryConfig;
+
+            //this is going to be the cloudinary account
+            Account acc = new Account(
+                _cloudinaryConfig.Value.CloudName,
+                _cloudinaryConfig.Value.ApiKey,
+                _cloudinaryConfig.Value.ApiSecret
+            );
+            // create a new instance of cloudinary and pass in the account detail;s from above
+            _cloudinary = new Cloudinary(acc);
+        }
+        [HttpGet("{id}", Name = "getPhoto")]
+        public async Task<IActionResult> GetPhoto(int id){
+            var photoFromRepo = await  _repo.GetPhoto(id);
+            var photo =  _mapper.Map<PhotoForReturnDto>(photoFromRepo);
+            return Ok(photo);
+        }
+        [HttpPost]
+        public async Task<IActionResult> AddPhotoForUser(int userId, PhotoForCreationDto photoDto){
+            var userFromRepo = await _repo.GetUser(userId);
+            if(userFromRepo == null){
+                return BadRequest("Could not find user");
+            }
+            var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            if(userFromRepo.Id != currentUserId){
+                return Unauthorized();
+            }
+            var file = photoDto.File;
+            var uploadResult = new ImageUploadResult();
+            if(file.Length > 0){
+                using (var stream = file.OpenReadStream()){
+                    var uploadParams = new ImageUploadParams(){
+                        File = new FileDescription(file.Name, stream)
+                    };
+                    uploadResult = _cloudinary.Upload(uploadParams);
+                }
+            }
+            photoDto.Url = uploadResult.Uri.ToString();
+            photoDto.PublicId = uploadResult.PublicId;
+
+            var photo = _mapper.Map<Photo>(photoDto);
+            photo.User = userFromRepo;
+
+            if(!userFromRepo.Photos.Any(m => m.IsMain)){
+                photo.IsMain = true;
+            }
+            userFromRepo.Photos.Add(photo);
+
+            var photoToReturn = _mapper.Map<PhotoForReturnDto>(photo);
+            if(await _repo.SaveAll()){
+                return CreatedAtRoute("GetPhoto", new {id = photo.Id}, photoToReturn);
+            }
+            return BadRequest("CouldNotAddPhoto");
+        }
+        }
+    }
+
+

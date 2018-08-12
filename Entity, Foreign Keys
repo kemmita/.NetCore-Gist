@@ -1,0 +1,37 @@
+//we want author to be a foreign key of courses so we will include a genereci collection in the author class
+   public Author()
+        {
+            Courses = new HashSet<Course>();
+        }
+
+        public int Id { get; set; }
+
+        public string Name { get; set; }
+
+        public virtual ICollection<Course> Courses { get; set; }
+    }
+    
+//now in the courses class we will include a geenric list of class author and also create an AuthorId property,
+//the authorId property will communicate with the id in the Author class
+    public virtual Author Author { get; set; }
+
+        public int AuthorId { get; set; }
+
+
+//notice how we give a value to our author list
+static void Main(string[] args)
+        {
+            var context = new PlutoContext();
+
+            var course = new Course {
+                Name = "Fortran",
+                Description = "Learn Fortran",
+                Level = 3,
+                FullPrice = 125,
+                Author = new Author { Id = 4, Name = "Russell Kemmit"}
+            };
+            context.Courses.Add(course);
+            context.SaveChanges();
+           
+            Console.ReadKey();
+        }

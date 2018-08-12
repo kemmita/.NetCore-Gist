@@ -1,0 +1,35 @@
+1. we want to add a success message after we added a book correctly 
+//we will start in the create controller and declare a property
+[TempData]
+        public string Message { get; set; }
+ 
+ //on line 16 this property from abaove will be called if the changes were saved 
+ //the message will play but it will play on the oage it is being redirected to which in our case is the index pag
+  public async Task<IActionResult> OnPost()
+        {
+            if (!ModelState.IsValid)
+            {
+                return Page();
+            }
+
+            _db.Books.Add(Book);
+            await _db.SaveChangesAsync();
+            Message = "New Book Added Successfully!";
+            return RedirectToPage("Index");
+        }
+ 
+ //in order to get that message we will need to create a property for message in the index controller
+ [TempData]
+        public string Message { get; set; }
+ 
+ 
+ //in the index view we can now use it
+ @if (Model.Message != null)
+{
+    <div class="alert alert-info alert-dismissable" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        @Model.Message
+    </div>
+}

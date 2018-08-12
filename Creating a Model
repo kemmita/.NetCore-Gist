@@ -1,0 +1,61 @@
+1. A model can simnply be described as a model we use to communicate with the database. 
+2. If there is not already a Model folder, create a Model folder, there is typically a Model folder already created when using Authentication "login/register"
+3. We will create a category model. Name the file Category.cs
+4. Below is the model's code.
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace FoodApp.Models
+{
+    public class Category
+    {
+        [Required] // The model state will return with an error if any property usign a required field is left empty. 
+        public int Id { get; set; } // The Id property will automatically be set to primary key
+
+        [Required]
+        [Display(Name = "Category Name")] // Display(Name) is what will be displayed when the property is referenced in the view.
+        public string Name { get; set; }
+
+        [Required]
+        [Display(Name = "Display Order")]
+        public int DisplayOrder { get; set; }
+    }
+}
+
+5. Now go to the Data folder and make your way into the ApplicationDbContext.cs file and add a db set for the model we just created.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using FoodApp.Models;
+namespace FoodApp.Data
+{
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    {
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+        }
+        public DbSet<Category> Categories { get; set; }
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+            // Customize the ASP.NET Identity model and override the defaults if needed.
+            // For example, you can rename the ASP.NET Identity table names and more.
+            // Add your customizations after calling base.OnModelCreating(builder);
+        }
+    }
+}
+
+
+6. Now in the nuget pm console run add-migration example
+7. Now run update-database
+8. Optional --> to view more details goto Data/Migrations and view the migration you created. 
+9. Go to your DB and verify that the table was created. 

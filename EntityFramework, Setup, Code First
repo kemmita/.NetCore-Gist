@@ -1,0 +1,174 @@
+1. create new project and then right away open nuget package manager and run install-project EntityFramework
+
+//create a Post class that we will convert into a table
+  class Post
+    {
+        public int ID { get; set; }
+        public DateTime DatePublished { get; set; }
+        public string Title { get; set; }
+        public string Body { get; set; }
+    }
+    
+
+//then create a class that derives/inherits from dbcontext
+ class BlogDbContext: DbContext
+    {
+        //here we create a dbset using our post class we created
+        public DbSet<Post> Posts { get; set; }
+    }
+ 
+//now we need to specify the connection string to the database so got to App.config
+<connectionStrings>
+    <add name="BlogDbContext" connectionString="data source=.\SQLEXPRESS; initial catalog=CodeFirstDemo; integrated security=SSPI" providerName="System.Data.SqlClient"/>
+  </connectionStrings>
+</configuration>
+
+
+//now go back to the code manager terminal and run command enable-migrations
+//now that we have created a table with columns above we need to runa migration, use command add-migration CreatedPostClass, CreatedPostClass is a message
+//you should now have a new folder called migrations
+//go back to your packcage manager terminal and run Update-Database, if you go back to your database, you will now have a new database name
+
+
+//main class
+static void Main(string[] args)
+        {
+        //create object of database context
+            var dataBObj = new BlogDbContext();
+            //add data to table
+            var post = new Post() {
+                ID = 2,
+                DatePublished = DateTime.Now,
+                Title = "I eat people",
+                Body = "Human flesh is tatsy!"
+            };
+            dataBObj.Posts.Add(post);
+            dataBObj.SaveChanges();
+            Console.ReadKey();
+        }
+
+**Exisitng database wanting to use migrations, codefirst**
+run add-migration InitialModel -IgnoreChanges -Force
+then run Update-Database
+
+
+//code first add class/table
+add new class/table and add its columns
+ class Category
+    {
+        //must be Id so Entity knows it is the primary key
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+    
+//the run command add-migration AddCategoriesTable
+our migration will intialy appear empty 
+ public partial class AddCategoriesTable : DbMigration
+    {
+        public override void Up()
+        {
+        }
+        
+        public override void Down()
+        {
+        }
+    }
+ //now we need to add the AddCategoriesTable migration genereated from the categories table to our context which extends from dbcontext
+ //add the dbset of the new table/class, line 81 was added manually by us
+  public virtual DbSet<Author> Authors { get; set; }
+        public virtual DbSet<Course> Courses { get; set; }
+        public virtual DbSet<Tag> Tags { get; set; }
+        public virtual DbSet<Category> Categories { get; set; }
+//then we need to run command 
+add-migration AddCategoriesTable -Force
+//if yout look at line 66 we already created this migration, so we use force in our command to overwrite it, now look in the imgration
+//file to see what it looks like, it is no longer empty
+public partial class AddCategoriesTable : DbMigration
+    {
+        public override void Up()
+        {
+            CreateTable(
+                "dbo.Categories",
+                c => new
+                    {
+                        Id = c.Int(nullable: false, identity: true),
+                        Name = c.String(),
+                    })
+                .PrimaryKey(t => t.Id);
+            
+        }
+        
+        public override void Down()
+        {
+            DropTable("dbo.Categories");
+        }
+    }
+ //now we can add data to this table using the old convention of initializing the table and db objects and adding data in the main class
+ //but using the sql method we can add the data inside of the migration file
+ public override void Up()
+        {
+            CreateTable(
+                "dbo.Categories",
+                c => new
+                    {
+                        Id = c.Int(nullable: false, identity: true),
+                        Name = c.String(),
+                    })
+                .PrimaryKey(t => t.Id);
+            //we do not need to add an id value becuase identity is set to true above
+            Sql("INSERT INTO Categories VALUES('.NET MVC Course')");
+            
+        }
+        
+ 
+ **add foreign key to exisiting table**
+ go into the table you wish to add the coulmn to and do 
+  public Category Category { get; set; }
+then run add-migration AddCategoryClumnToCoursesTable
+then run Update-Database
+
+**add new column to class**
+//go into the class you wish to alter and add a new column/property
+public DateTime? DatePublished { get; set; }
+//then run a command to create a migration
+add-migration AddDatePublishedColumnToCoursesTable
+//then run Update-Database
+
+
+**change column name within table**
+//simply go to class you wish to alter and refactor/rename the column name and then create a migration by running add-migration ChangeColumnNameToName
+//now in your migration chnage Name with Title for up and down
+   public override void Up()
+        {
+            AddColumn("dbo.Courses", "Name", c => c.String(nullable: false));
+            Sql("UPDATE Courses SET Name = Title");
+            DropColumn("dbo.Courses", "Title");
+        }
+        
+        public override void Down()
+        {
+            AddColumn("dbo.Courses", "Title", c => c.String(nullable: false));
+            Sql("UPDATE Courses SET Title = Name");
+            DropColumn("dbo.Courses", "Name");
+        }
+
+**Remove clumn from table**
+go to class and remove property/column
+then run add-migration removecolumnbfromtable
+then run Database-Update
+
+
+
+**Deleting Table/class**
+//delete class from source folder and then remove dbset from context file
+//then run command add-migration deletecattable
+//then run Update-Database
+
+
+
+
+
+
+
+
+

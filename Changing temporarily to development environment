@@ -1,0 +1,1 @@
+in powershell run $Env:ASPNETCORE_ENVIRONMENT = "Development"

@@ -1,0 +1,4 @@
+1. Using the Tag helpers the code knows where to go for the controller and which action will be used in the controller. If we need to edit
+something we can use the route-id so that the id of the data is passed to the action within the controloler.
+
+<a asp-action="Edit" asp-controller="Home" asp-route-id="@item.Id">Edit</a>

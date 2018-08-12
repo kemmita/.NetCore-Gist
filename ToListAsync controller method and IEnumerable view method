@@ -1,0 +1,17 @@
+1. The ToListAsync method will return the list back in the order it was created.
+
+  public async Task<IActionResult> Index()
+  {
+  return View(await _db.Categories.ToListAsync());
+  }
+
+2. In the view we use IEnumerable to provide a list, once the list is provided, we will need to itterate with a foreach loop
+
+  @model IEnumerable<FoodApp.Models.Category>
+  @{
+    ViewData["Title"] = "Index";
+  }
+  @foreach (var cat in Model)
+  {
+    @cat.Name 
+  }
