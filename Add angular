@@ -1,0 +1,7 @@
+1. Make sure that npm is installed and that angulais installed globally 
+2. This part is important, we will have our .net core app and our Angular app next to eachother so instead of adding angular to
+ /c/Demo/DatingApp/DatingApp.API, we will want to add it to  /c/Demo/DatingApp this way they will be installed next to eachother
+ then run in the correct file path  ng new DatingApp.SPA
+
+3. then in bash go to directory /c/Demo/DatingApp then run code .
+this will ensure that both the frontend and abckend open up side by side in vs code

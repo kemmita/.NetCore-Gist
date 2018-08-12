@@ -1,0 +1,63 @@
+1.in vs code hit ctrl shift p and type nuget package to open nuget package manager then type AutoMapper.Extensions and select the one 
+that has AutoMapper.Extensions in its title, select the latest version and then restore your vscode
+
+2.in csproj file you should see 
+<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="3.2.0"/>
+
+3.then in your startup file add automapper to your services
+services.AddCors();
+services.AddAutoMapper();
+
+
+
+
+
+
+4.if you do not have a helpers folder create one and then create a file called AutoMapperProfiles
+
+using System.Linq;
+using AutoMapper;
+using DatingApp.API.Dtos;
+using DatingApp.API.models;
+
+namespace DatingApp.API.Helpers
+{
+    public class AutoMapperProfiles: Profile
+    {
+        public AutoMapperProfiles()
+        {
+            CreateMap<User, UserForListDto>()
+            .ForMember(dest => dest.PhotoUrl,  opt => {
+                opt.MapFrom(src => src.Photos.FirstOrDefault(p => p.IsMain).Url);
+            })
+            .ForMember(desd => desd.Age, opti => {
+                opti.ResolveUsing( d => d.DateOfBirth.CalcAge());
+            });
+            CreateMap<User, UserForDetailedDto>();
+            CreateMap<Photo, PhotosForDetailedDto>();
+        }
+    }
+}
+
+
+
+
+
+5.to use it in a controller inject it in the controller 
+        private readonly IMapper _mapper;
+        public UsersController(IMapper mapper)
+        {
+      
+            _mapper = mapper;
+        }
+
+
+             [HttpGet("{id}")]
+        public async Task<IActionResult> GetUser(int id){
+        // find the user using the repo where the databased is queried "In a different file"
+            var user = await _repo.GetUser(id);
+            //now using automapping we grab only the data specified in the user for detail dto and that data will be specfifc
+            //to the indivudal we grabed from the line above
+             var userToReturn = _mapper.Map<UserForDetailedDto>(user);
+            return Ok(userToReturn);
+        }

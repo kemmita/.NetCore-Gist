@@ -1,0 +1,111 @@
+1. We will need to create a form and place the search box within the form
+//our search will be directed to the Users controller and the index action
+<form asp-controller="Users" asp-action="Index" method="get">
+    <h2 class="text-center">Customers</h2>
+    <div style="height: 60px;">
+        <div class="row">
+            <div class="col-sm-3" style="padding-top: 20px;">
+                <a asp-controller="Account" asp-action="Register" class="btn btn-primary" style="width: 200px;">
+                    <span class="glyphicon glyphicon-plus"></span> &nbsp; Add New Customer
+                </a>
+            </div>
+            <div class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-12 text-right">
+                        <b>Search: </b>
+                        //using the Html hellpers we will pass the option object to our controller 
+                        //so if we select Email the option will be sent to the method along with its value "email"
+                        <label class="radio-inline">@Html.RadioButton("option", "name")Name</label>
+                        <label class="radio-inline">@Html.RadioButton("option", "email")Email</label>
+                        <label class="radio-inline">@Html.RadioButton("option", "phone")Phone</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="pull-right">
+                    //we will ne a button of type submit for the form we are working in.
+                        <button type="submit" name="submit" value="Search" class="btn btn-primary">
+                            <span class="glyphicon glyphicon-search"></span> Search
+                        </button>
+                    </div>
+                    <div class="pull-right">
+                    //this will be the input area with the object search passed from the html helper to the controller
+                        @Html.Editor("search", new { htmlAttributes = new {@class="form-control"}})
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <hr />
+    <br />
+    <div class="form-border">
+        <table class="table table-condensed table-hover">
+            <tr>
+                <th>
+                    @Html.DisplayNameFor(m=>m.FirstName)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(m=>m.LastName)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(m=>m.PhoneNumber)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(m=>m.Email)
+                </th>
+                <th></th>
+                <th></th>
+                <th></th>
+            </tr>
+            
+            @foreach (var user in Model)
+            {
+                <tr>
+                    <td>@user.FirstName</td>
+                    <td>@user.LastName</td>
+                    <td>@user.PhoneNumber</td>
+                    <td>@user.Email</td>
+                    <td>
+                        <a asp-controller="Cars" asp-action="Index" asp-route-userId="@user.Id">
+                            <img src="/images/car.png"  width="40" />&nbsp; View Cars
+                        </a>
+                    </td>
+                    <td>Edit |Delete | Details</td>
+                </tr>
+                
+            }
+        </table>
+    </div>
+</form>
+
+2. Now we get to our controller
+    //here we pass option and search from the view
+        public IActionResult Index(string option=null, string search=null)
+        {
+            var users = _db.Users.ToList();
+            //if the user selects radiobutton email and the search field is not empty then line 26 will run
+            if (option == "email" && search != null)
+            {
+      //now we go into the database and fetch the data associated with the email entered, we also call on the to lower method to make all text enetered into lowercase
+                users = _db.Users.Where(u => u.Email.ToLower().Contains(search.ToLower())).ToList();
+            }
+            else
+            {
+                //reference line 86
+                if (option == "name" && search != null)
+                {
+                    users = _db.Users.Where(u => u.FirstName.ToLower().Contains(search.ToLower())
+                                                 || u.LastName.ToLower().Contains(search.ToLower())).ToList();
+                }
+
+                else
+                {
+                    if (option == "phone" && search != null)
+                    {
+                        users = _db.Users.Where(u => u.PhoneNumber.Contains(search)).ToList();
+                    }
+                }
+            }
+
+            return View(users);
+        }

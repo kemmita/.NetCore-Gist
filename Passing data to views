@@ -1,0 +1,59 @@
+
+0. If you are not passing a list or an array you can use @model CarsByRuss.Models.ServiceType and then @Model.Name to render data
+but if you are passing a list you will need to use an @model IEnumerable<ApplicationUser> and then you will need to use
+Html helpers to render data @Html.DisplayNameFor(m=>m.FirstName)
+1.Inside of our controller we will need to supply our dbcontext along with the model/table we ish to use in the view
+
+ private readonly ApplicationDbContext _db;
+
+        public BooksController(ApplicationDbContext db)
+        {
+            _db = db;
+
+        }
+        public IActionResult Index()
+        {
+            return View(_db.Books.ToList());
+        }
+2. In the view we will need to include the model up top
+@model IEnumerable<BookList.Models.Book>
+@{
+    ViewData["Title"] = "Index";
+}
+
+<br /> 
+<h2>Book List</h2>
+<hr />
+<p>
+    <a asp-action="Create" class="btn btn-primary">Add</a>
+</p>
+<br />
+<div class="form-border">
+    <table class="table">
+        <tr>
+            <th>
+                @Html.DisplayNameFor(m=>m.Name)
+            </th>
+            <th></th>
+        </tr>
+//here in the for each loop we call on the Model, refereing to the model imported above
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                //using @item we can grab the name of each book from the database
+                    @item.Name
+                    
+                //another way of doing this is using the html helper tag, takes more code
+                @Html.DisplayFor(m=>item.Name)
+                </td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-success">Edit</a>
+                    <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-warning">Details</a>
+                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr> 
+        }
+    </table>
+</div>
+

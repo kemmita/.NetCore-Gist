@@ -1,0 +1,6 @@
+in the Shared folder we will create a new view, when creating make sure you select partial view
+
+now in the full view we include the partial as a table data
+ <td>
+    @Html.Partial("_TableButtonPartial");
+ </td>

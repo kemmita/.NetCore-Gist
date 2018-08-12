@@ -1,0 +1,64 @@
+**READ FIRST**
+if you enable authentication, the database will be compiled and chosen automatically, so if you want, you can grab the database string
+from below and add that to the apssetiings.josn file. after that, run updat-database, and you will have successfully changed the 
+database.
+
+
+1. veirfy you have a username and password in ssms you can add one by watching this video at around the 16 minute mark https://www.youtube.com/watch?v=IDxXUBNBxPA
+2. Create a table/model in .NET framework
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace BookList.Models
+{
+    public class Book
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }              
+    }
+}
+3. then add another model called ApplicationDbContext on line 32 you can see where we use the model form above in a DbSet
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+
+namespace BookList.Models
+{
+    public class ApplicationDbContext: DbContext
+    {
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+
+        }
+        public DbSet<Book> Books { get; set; }
+        
+    }
+}
+4.Then in Startup.cs add our dbcontext to our ConfigureServices method
+   public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddMvc();
+        }
+ 5.this last part is verry important, go to appsettings.json and add our connection string
+ {
+
+  "Logging": {
+    "IncludeScopes": false,
+    "LogLevel": {
+      "Default": "Warning"
+    }
+  },
+
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=DESKTOP-6DG4N32\\SQLEXPRESS;Database=Book;User ID=root; Password=password;"
+  } 
+}
+6.Then run add-migration migrationmsgexample verify that your migration is good and that your Book table has been added, then run
+update-database 

@@ -1,0 +1,1 @@
+1. the framework comes with register and login right out of the box, one must only add-migration to initialize it. 

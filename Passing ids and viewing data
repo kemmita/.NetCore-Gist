@@ -1,0 +1,39 @@
+1. when we click on a name of a book, we want to be able to see its details
+2. go to where the book title is and click the edit button
+//below we are importing the data from the database without the code below, we could not grab the id of the book we want to view
+model IEnumerable<BookList.Models.Book>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @item.Name
+                </td>
+                <td>
+                //when this button is clicked the id of the book will be grabbed usuing asp-route-id="@item.Id"
+                //the id will then be routed to the asp-action in our controller we declared below details
+                    <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-success">Edit</a>
+                       </td>
+            </tr> 
+        }
+
+//now in the controller, we go to our details action and pass in a id
+      public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            //the var book below will find the book in the database and then take on its value
+            var book = await _db.Books.SingleOrDefaultAsync(m => m.Id == id);
+            if (book == null)
+            {
+                return NotFound();
+            }
+            //then the data will be transfered to the Details view
+            return View(book);
+        }
+//Details View, we import the model and we can see that the book object from the controller above has made it here and the name will appear
+@model BookList.Models.Book
+<h2><strong>Book Title:</strong> @Model.Name</h2>
+

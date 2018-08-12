@@ -1,0 +1,113 @@
+1.Reference .NET Core, Setup cloudinary file to see how to set it up on the server
+
+2. then run npm install ng2-file-upload --save
+
+3. Here is the html code
+<div class="row">
+ 
+  <div class="col-md-3">
+
+      <h3>Select files</h3>
+    
+      <div ng2FileDrop
+           [ngClass]="{'nv-file-over': hasBaseDropZoneOver}"
+           (fileOver)="fileOverBase($event)"
+           [uploader]="uploader"
+           class="well my-drop-zone">
+          Drop Photo Here!
+      </div>
+    
+    
+      <input type="file" ng2FileSelect [uploader]="uploader" multiple  /><br/>
+
+      <!-- Single
+      <input type="file" ng2FileSelect [uploader]="uploader" /> -->
+  </div>
+
+  <div class="col-md-9" style="margin-bottom: 40px" *ngIf="uploader?.queue?.length">
+
+      <h3>Upload queue</h3>
+      <p>Queue length: {{ uploader?.queue?.length }}</p>
+
+      <table class="table">
+          <thead>
+          <tr>
+              <th width="50%">Name</th>
+              <th>Size</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let item of uploader.queue">
+              <td><strong>{{ item?.file?.name }}</strong></td>
+              <td *ngIf="uploader.isHTML5" nowrap>{{ item?.file?.size/1024/1024 | number:'.2' }} MB</td>
+              <td *ngIf="uploader.isHTML5">
+              </td>
+          </tr>
+          </tbody>
+      </table>
+
+      <div>
+          <div>
+              Queue progress:
+              <div class="progress" style="">
+                  <div class="progress-bar" role="progressbar" [ngStyle]="{ 'width': uploader.progress + '%' }"></div>
+              </div>
+          </div>
+          <button type="button" class="btn btn-success btn-s"
+                  (click)="uploader.uploadAll()" [disabled]="!uploader.getNotUploadedItems().length">
+              <span class="glyphicon glyphicon-upload"></span> Upload
+          </button>
+          <button type="button" class="btn btn-warning btn-s"
+                  (click)="uploader.cancelAll()" [disabled]="!uploader.isUploading">
+              <span class="glyphicon glyphicon-ban-circle"></span> Cancel
+          </button>
+          <button type="button" class="btn btn-danger btn-s"
+                  (click)="uploader.clearQueue()" [disabled]="!uploader.queue.length">
+              <span class="glyphicon glyphicon-trash"></span> Remove
+          </button>
+      </div>
+
+  </div>
+
+</div>
+
+
+4. and here is the ts code
+import { Component, OnInit, Input } from '@angular/core';
+import { Photo } from '../../_models/Photo';
+import { FileUploader } from 'ng2-file-upload';
+import { environment } from '../../../environments/environment';
+import { AuthService } from '../../_services/auth.service';
+import { AlertifyService } from '../../_services/alertify.service';
+
+@Component({
+  selector: 'app-photo-editor',
+  templateUrl: './photo-editor.component.html',
+  styleUrls: ['./photo-editor.component.css']
+})
+export class PhotoEditorComponent implements OnInit {
+@Input() photos: Photo[];
+uploader: FileUploader;
+hasBaseDropZoneOver = false;
+baseUrl = environment.apiUrl;
+  constructor(private authservice: AuthService) { }
+
+  ngOnInit() {
+    this.initializeUploader();
+  }
+  public fileOverBase(e: any): void {
+    this.hasBaseDropZoneOver = e;
+  }
+
+  initializeUploader() {
+    this.uploader = new FileUploader({
+      url: this.baseUrl + 'users/' + this.authservice.decodedToken.nameid + '/photos',
+      authToken: 'Bearer ' + localStorage.getItem('token'),
+      isHTML5: true,
+      allowedFileType: ['image'],
+      removeAfterUpload: true,
+      autoUpload: false,
+      maxFileSize: 10 * 1024 * 1024
+    });
+  }
+}

@@ -1,0 +1,50 @@
+      //if it is a simple application, using the Http Verbs will work just fine.
+      // GET: api/TestThis
+
+        public IEnumerable<string> Get()
+        {
+            return new string[] { "value1", "value2" };
+        }
+
+        // GET: api/TestThis/5
+     
+        public string Get(int id)
+        {
+            return "value";
+        }
+        
+        // POST: api/TestThis
+
+        public void Post([FromBody]string value)
+        {
+        }
+        
+        // PUT: api/TestThis/5
+    
+        public void Put(int id, [FromBody]string value)
+        {
+        }
+        
+        // DELETE: api/ApiWithActions/5
+       
+        public void Delete(int id)
+        {
+        }
+     
+ //now if it is going to have many methods you will need to use attribute routing
+ //to reach the first one we would go to url http://localhost:51366/api/Products
+        [HttpGet]
+        public IEnumerable<Product> Get()
+        {
+            return products.ToList();
+        }
+
+//to reach the second one we would go to url http://localhost:51366/api/Products/LoadThis
+        [HttpGet("LoadThis")]
+        public IEnumerable<Product> GetThis()
+        {
+            return products.ToList();
+        }
+
+
+the above example would work for all Http verbs.

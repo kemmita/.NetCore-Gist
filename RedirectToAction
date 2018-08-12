@@ -1,0 +1,2 @@
+if we wish to redirect to a view that is heald within a different controller then redirect like we do below
+return RedirectToAction("Index", "Users");

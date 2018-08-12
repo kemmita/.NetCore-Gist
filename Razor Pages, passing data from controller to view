@@ -1,0 +1,92 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using BookList_Razor.Model;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+
+namespace BookList_Razor.Pages.BookList
+{
+    public class IndexModel : PageModel
+    {
+   // in the controller we call on the dbcontext of the database 
+        private ApplicationDbContext  _db;
+  //we then initialize the db object in the controller
+        public IndexModel(ApplicationDbContext db)
+        {
+            _db = db;
+        }
+   //we will want to display all of the books so we use IEnumerable to return all books
+        public IEnumerable<Book> Books { get; set; }
+    
+    //the on get method is what sends the data to the page
+        public async Task OnGet()
+        {
+            Books = await _db.Books.ToListAsync();
+        }
+    }
+}
+//below is the page
+@page
+@model BookList_Razor.Pages.BookList.IndexModel
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h2 class="text-center">Book List</h2>
+<br />
+<a asp-page="Pages/BookList/Create" class="btn  btn-primary">Add New Book</a>
+
+@if (Model.Books.Count() > 0)
+{
+    <form method="get">
+        <div>
+            <br />
+            <table class="table table-condensed table-hover">
+                <tr>
+                    <th>
+                        ISBN
+                    </th>
+                    <th>
+                        Title
+                    </th>
+                    <th>
+                        Author
+                    </th>
+                    <th>
+                        Price
+                    </th>
+                    <th>
+                        Avaibility 
+                    </th>
+                </tr>
+                @foreach (var b in @Model.Books)
+                {
+                <tr>
+                    <td>
+                        @b.ISBN
+                    </td>
+                    <td>
+                        @b.Title
+                    </td>
+                    <td>
+                        @b.Author
+                    </td>
+                    <td>
+                        @b.Price
+                    </td>
+                    <td>
+                        @b.Avaibility
+                    </td>
+                </tr>
+                }
+            </table>
+        </div>
+    </form>
+}
+else
+{
+    <p>No Books Found.</p>
+}

@@ -1,0 +1,199 @@
+1. We will want areas of our site to be protected if a user is not loged in, if they click a certain link, they cannot gain access without 
+being logedin, not only will it not let them visit that page, but it will automatically redirect them to the login page. Now in order
+to protect a view/page like this, go to its controller and add the [Authorize] method above the class name
+
+namespace CarsByRuss.Controllers
+{
+**Right here**
+    [Authorize]
+    public class ServiceTypesController : Controller
+    {
+        private readonly ApplicationDbContext _db;
+
+        public ServiceTypesController( ApplicationDbContext db)
+        {
+            _db = db;
+        }
+        public IActionResult Index()
+        {
+            return View(_db.ServiceTypes.ToList());
+        }
+
+
+
+
+2.We can add further functionality and define which type of user can visit that page once loged in
+[Authorize(Roles = SD.AdminEndUser)]
+3. to see how to define a admin, reference the other file
+
+4.Now that access is restricted to normal users, we will want the link to be hidden altogether if a non-admin logs in
+go to the view and add an if statement 
+<div class="navbar-collapse collapse">
+                <ul class="nav navbar-nav">
+                    @if (User.IsInRole(SD.AdminEndUser))
+                        {
+                             <li><a asp-area="" asp-controller="Users" asp-action="Index">User</a></li>
+                        }
+                    @if (User.IsInRole(SD.AdminEndUser))
+                    {
+                        <li><a asp-area="" asp-controller="ServiceTypes" asp-action="Index">Services</a></li>
+                    }
+                    <li><a asp-area="" asp-controller="Cars" asp-action="Index">Cars</a></li>
+                </ul>
+                @await Html.PartialAsync("_LoginPartial")
+            </div>
+        </div>
+        
+ 5. We can also add Authorization to actions indivudally, this way every action is not restrictyed to one type of user.
+ using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using CarsByRuss.Data;
+using CarsByRuss.Models;
+using CarsByRuss.Utility;
+using CarsByRuss.ViewModels;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarsByRuss.Controllers
+{
+    public class ServicesController : Controller
+    {
+        private readonly ApplicationDbContext _db;
+
+        public ServicesController(ApplicationDbContext db)
+        {
+            _db = db;
+        }
+        [Authorize]
+        public IActionResult Index(int carId)
+        {
+            var car = _db.Cars.FirstOrDefault(c => c.Id == carId);
+            var model = new CarAndServicesViewModel
+            {
+                carId = car.Id,
+                Make = car.Make,
+                Model = car.Model,
+                Style = car.Style,
+                VIN = car.VIN,
+                Year = car.Year,
+                UserId = car.UserId,
+                ServiceTypesObj = _db.ServiceTypes.ToList(),
+                //here we will grab the services and order by descending in the date they were added, and we will only
+                //display 5 at a time. 
+                PastServicesObj = _db.Services.Where(s => s.CarId == carId)
+                    .OrderByDescending(s => s.DateAdded)
+            };
+            return View(model);
+        }
+        [Authorize(Roles = SD.AdminEndUser)]
+        public IActionResult Create(int carId)
+        {
+
+            var car = _db.Cars.FirstOrDefault(c => c.Id == carId);
+            var model = new CarAndServicesViewModel
+            {
+                carId = car.Id,
+                Make =car.Make,
+                Model=car.Model,
+                Style = car.Style,
+                VIN =car.VIN,
+                Year = car.Year,
+                UserId = car.UserId,
+                ServiceTypesObj = _db.ServiceTypes.ToList(),
+                //here we will grab the services and order by descending in the date they were added, and we will only
+                //display 5 at a time. 
+                PastServicesObj = _db.Services.Where(s=>s.CarId ==carId)
+                .OrderByDescending(s=> s.DateAdded).Take(5)
+            };
+            return View(model);
+        }
+        [Authorize(Roles = SD.AdminEndUser)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(CarAndServicesViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                //the carid and date will not passed with the view model so we need to add them here
+                model.NewServiceObj.CarId = model.carId;
+                model.NewServiceObj.DateAdded = DateTime.Now;
+                //comment end
+                _db.Add(model.NewServiceObj);
+                await _db.SaveChangesAsync();
+                return RedirectToAction("Create", new {carId = model.carId });
+            }
+
+            var car = _db.Cars.FirstOrDefault(c => c.Id == model.carId);
+            var newModel = new CarAndServicesViewModel
+            {
+                
+                carId = car.Id,
+                Make = car.Make,
+                Model = car.Model,
+                Style = car.Style,
+                VIN = car.VIN,
+                Year = car.Year,
+                UserId = car.UserId,
+                //this will grab all the service types so they will be displayed in the drop down
+                ServiceTypesObj = _db.ServiceTypes.ToList(),
+
+                //here we will grab the services and order by descending in the date they were added, and we will only
+                //display 5 at a time. 
+                PastServicesObj = _db.Services.Where(s => s.CarId == model.carId)
+                    .OrderByDescending(s => s.DateAdded).Take(5)
+            };
+
+            return View(newModel);
+        }
+        [Authorize(Roles = SD.AdminEndUser)]
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var service = await _db.Services.Include(s => s.Car).Include(s => s.ServiceType)
+                .SingleOrDefaultAsync(m => m.Id == id);
+
+            if (service == null)
+            {
+                return NotFound();
+            }
+
+            return View(service);
+        }
+        [Authorize(Roles = SD.AdminEndUser)]
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(Service model)
+        {
+            var serviceId = model.Id;
+            var carId = model.CarId;
+            var service = await _db.Services.SingleOrDefaultAsync(m => m.Id == serviceId);
+            if (service == null)
+            {
+                return NotFound();
+            }
+
+            _db.Services.Remove(service);
+            await _db.SaveChangesAsync();
+            return RedirectToAction("Create",  new { carId = model.CarId });
+
+        }
+
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _db.Dispose();
+            }
+        }
+    }
+}
+ 

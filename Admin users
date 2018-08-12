@@ -1,0 +1,130 @@
+1. to create and admin user first create a new folder called Utility then add a class called SD, "Static Details"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+namespace CarsByRuss.Utility
+{
+    public class SD
+    {
+        public const string AdminEndUser = "Admin";
+        public const string CustomerEndUser = "Customer";
+    }
+}
+
+2. go into Models/AccountViewModels/RegisterView Model and add a property for admin
+public bool IsAdmin { get; set; }
+
+3. Then go into our AccountController that was created for us wehn we created our .NET Core MVC project
+//we need to add a rolemanager property using the .net RoleManager and IdentityRole method
+private readonly RoleManager<IdentityRole> _roleManager;
+//then initialize it in the class constructor 
+      public AccountController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+
+            RoleManager<IdentityRole> roleManager,
+            IEmailSender emailSender,
+            ILogger<AccountController> logger, ApplicationDbContext db)
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _emailSender = emailSender;
+            _logger = logger;
+            _db = db;
+            _roleManager = roleManager;
+        }
+
+//now lets go to our Register method
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            if (ModelState.IsValid)
+            {
+                var user = new ApplicationUser
+                {
+                    UserName = model.Email,
+                    Email = model.Email,
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    Address = model.Address,
+                    City = model.City,
+                    PostalCode = model.PostalCode,
+                    PhoneNumber = model.PhoneNumber
+                    
+                };
+                var result = await _userManager.CreateAsync(user, model.Password);
+                if (result.Succeeded)
+                {
+                    //this will help us assign roles in the database 
+                    if (!await _roleManager.RoleExistsAsync(SD.CustomerEndUser))
+                    {
+                        await _roleManager.CreateAsync(new IdentityRole(SD.CustomerEndUser));
+                    }
+                    if (!await _roleManager.RoleExistsAsync(SD.AdminEndUser))
+                    {
+                        await _roleManager.CreateAsync(new IdentityRole(SD.AdminEndUser));
+                    }
+
+                    //if it is admin we want to add to adminenduser, we can see that the first param user
+                    //references the user object above
+                    if (model.IsAdmin)
+                    { 
+                        await _userManager.AddToRoleAsync(user, SD.AdminEndUser);
+                    }
+                    else
+                    //they will be added to customer enduser
+                    {
+                        await _userManager.AddToRoleAsync(user, SD.CustomerEndUser);
+                    }
+                    _logger.LogInformation("User created a new account with password.");
+
+                    var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                    var callbackUrl = Url.EmailConfirmationLink(user.Id, code, Request.Scheme);
+                    await _emailSender.SendEmailConfirmationAsync(model.Email, callbackUrl);
+
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    _logger.LogInformation("User created a new account with password.");
+                    return RedirectToLocal(returnUrl);
+                }
+                AddErrors(result);
+            }
+
+            // If we got this far, something failed, redisplay form
+            return View(model);
+        }
+4.now in the Registerview use razor statements to verify if someone is an Admin or not
+
+ @if (User.IsInRole(SD.AdminEndUser))
+        {
+            <div class="form-group">
+                <div class="row">
+                    <div class="col-sm-2">
+                        <label asp-for="IsAdmin" class="custom-label"></label>
+                    </div>
+                    <div class="col-sm-4">
+                        <input asp-for="IsAdmin" type="checkbox"/>
+                    </div>
+                </div>
+                <span asp-validation-for="IsAdmin" class="text-danger"></span>
+            </div>
+        }
+        <div class="form-group">
+            <div class="row">
+                <div class="col-sm-2">
+
+                </div>
+                <div class="col-sm-4">
+                    @if (User.IsInRole(SD.AdminEndUser))
+                    {
+                <button type="submit" class="btn btn-primary form-control">Add Customer</button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-primary form-control">Submit</button>
+                    }
+                </div>

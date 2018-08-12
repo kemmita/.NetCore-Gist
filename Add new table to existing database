@@ -1,0 +1,29 @@
+1. go to models to add the new table/model
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace CarsByRuss.Models
+{
+    public class ServiceType
+    {
+    //create columns
+        public int ID { get; set; }
+        public String Name { get; set; }
+    }
+}
+
+2. next go to Data/ApplicationDbContext and add a new db set for the database, it must be right under the class constructor
+public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+        }
+
+        public DbSet<ServiceType> ServiceTypes { get; set; }
+        
+        
+3.Then run add-migration and then update-database
+
+
+

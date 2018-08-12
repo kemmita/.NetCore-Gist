@@ -1,0 +1,61 @@
+1. one person can have many likers and one persona can like many people so we need to create a many to manby relationship.
+
+2. first go into model and create a new like model
+namespace DatingApp.API.models
+{
+    public class Like
+    {
+        public int LikerId { get; set; }
+        public int LikeeId { get; set; }
+        //both liker and like property have a type of User
+        public User Liker { get; set; }
+        public User Likee { get; set; }
+    }
+}
+
+3. in the user model add 
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+
+namespace DatingApp.API.models
+{
+    public class User
+    {
+        //this is establishes the 1 to many functionality between the User model and the Like model
+        public ICollection<Like> Liker { get; set; }
+        public ICollection<Like> Likee { get; set; }
+
+
+    }
+}
+
+4. now in the data contect we need to create two new db sets and override the ModelBuilder
+using DatingApp.API.models;
+using Microsoft.EntityFrameworkCore;
+
+namespace DatingApp.API.Data
+{
+    public class DataContext: DbContext
+    {
+        public DbSet<Like> Likes { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder builder){
+            builder.Entity<Like>()
+            .HasKey(k => new {k.LikerId, k.LikeeId});
+
+            builder.Entity<Like>()
+            .HasOne(u => u.Likee)
+            .WithMany(u => u.Liker)
+            .HasForeignKey(u => u.LikeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Like>()
+            .HasOne(u => u.Liker)
+            .WithMany(u => u.Likee)
+            .HasForeignKey(u => u.LikerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        }
+    }
+}

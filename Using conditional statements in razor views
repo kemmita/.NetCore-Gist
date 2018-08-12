@@ -1,0 +1,9 @@
+ //Depending on if the user is an Admin a add customer or Submit button will be displayed
+  @if (User.IsInRole(SD.AdminEndUser))
+                    {
+                <button type="submit" class="btn btn-primary form-control">Add Customer</button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-primary form-control">Submit</button>
+                    }

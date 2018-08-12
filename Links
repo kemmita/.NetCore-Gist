@@ -1,0 +1,59 @@
+**Better Way To Do It***
+//the whole link wll depend on the .NET helper tag and that the controller and action specified exist
+view
+<li><a asp-area="" asp-controller="Books" asp-action="Index">Books</a></li>
+//in order for the link to work above we will need a controller call BooksController and a IActionReult called Index
+controller
+//they both exist so the link will work
+public class BooksController : Controller
+    {
+        private readonly ApplicationDbContext _db;
+
+        public BooksController(ApplicationDbContext db)
+        {
+            _db = db;
+
+        }
+        public IActionResult Index()
+        {
+            return View(_db.Books.ToList());
+        }
+
+
+
+
+
+
+
+
+
+
+1. if we want to redirect a user with a link in .NET we can use asp-action but it must be linking out to a page that is within
+the same controller from which we are currently using
+
+2.so here is the BooksController we have an Iactionresult for index and create
+ public IActionResult Index()
+        {
+            return View(_db.Books.ToList());
+        }
+
+        public IActionResult Create()
+        {
+            return View();
+        }
+3. here is the view for index
+@{
+    ViewData["Title"] = "Index";
+}
+
+<br /> 
+<h2>Book List</h2>
+<hr />
+<p>
+//here we link to our create view and we can do this without a route because they both belong to thew same controller
+    <a asp-action="Create" class="btn btn-primary">Add</a>
+</p>
+
+
+
+

@@ -1,0 +1,109 @@
+1. in vs if you select the .NET Core API package, Entity framework will be installed already and if it is not then you can go to
+nugget pm store and download it.
+
+2.Now create a Models fodler and create your first model/tabel
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace RestApiMainProject.Models
+{
+    public class Product
+    {
+        public int Id { get; set; }
+        public string ProductName { get; set; }
+        public int Price { get; set; }
+    }
+}
+
+3.Now create a new fodler in the project called Data
+4.then create a new c# class called ProductsDbContext or just ExampleDbContext and make sure it inherits from the DbContext
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using RestApiMainProject.Models;
+
+namespace RestApiMainProject.Data
+{
+    public class ProductsDbContext: DbContext
+    {
+     public ProductsDbContext(DbContextOptions<ProductsDbContext>options):base(options)
+        {
+            
+        }
+        //then create a DbSet for each model/tabel
+        public DbSet<Product> Products { get; set; }
+    }
+}
+
+5. now in the startup class define your connection string.
+if you need help finding your connection string in visual studio open up SQL Server Object Esxplorer
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using RestApiMainProject.Data;
+
+namespace RestApiMainProject
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
+
+        public IConfiguration Configuration { get; }
+
+        // This method gets called by the runtime. Use this method to add services to the container.
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddMvc();
+            services.AddDbContext<ProductsDbContext>(option=>option.UseSqlServer(Configuration.GetConnectionString("ProductDbContext")));
+           }
+
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ProductsDbContext productsDbContext)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseMvc();
+            productsDbContext.Database.EnsureCreated();
+        }
+    }
+}
+6.appsetting.json
+{
+  "ConnectionStrings": {
+    "ProductDbContext": "Data Source=(localdb)\ProjectsV13;Initial Catalog=master;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False"
+  },
+  "Logging": {
+    "IncludeScopes": false,
+    "Debug": {
+      "LogLevel": {
+        "Default": "Warning"
+      }
+    },
+    "Console": {
+      "LogLevel": {
+        "Default": "Warning"
+      }
+    }
+  }
+}
+
+7. now in the nm terminal run add-migration initial and then run update-database

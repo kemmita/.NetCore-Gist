@@ -1,0 +1,157 @@
+1. add new folder to project called services and then add and IExampleRepository and then a ExampleRepository
+
+2. here is the interface
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using RestApiMainProject.Models;
+
+namespace RestApiMainProject.Services
+{
+     public interface IProductsRepository
+    {
+        IEnumerable<Product> GetProducts();
+        Product GetProduct(int id);
+        void AddProduct(Product product);
+        void UpdateProduct(int id,Product product);
+        void DeleteProduct(int id);
+    }
+}
+
+
+3. here is the actual repository
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using RestApiMainProject.Data;
+using RestApiMainProject.Models;
+
+namespace RestApiMainProject.Services
+{
+    public class ProductsRepository: IProductsRepository
+    {
+        private readonly ProductsDbContext _db;
+
+        public ProductsRepository(ProductsDbContext db)
+        {
+            _db = db;
+        }
+     
+        public IEnumerable<Product> GetProducts()
+        {
+            return _db.Products;
+        }
+
+        public Product GetProduct(int id)
+        {
+            var product = _db.Products.SingleOrDefault(p => p.Id == id);
+
+            return product;
+        }
+
+        public void AddProduct(Product product)
+        {
+           
+            _db.Products.Add(product);
+            _db.SaveChanges(true);
+        }
+
+        public void UpdateProduct(int id, Product product)
+        {
+            var productFromDb = _db.Products.Find(id);
+            productFromDb.ProductName = product.ProductName;
+            productFromDb.Price = product.Price;
+            _db.SaveChanges(true);
+        }
+
+        public void DeleteProduct(int id)
+        {
+            var itemFromDb = _db.Products.Find(id);
+            _db.Remove(itemFromDb);
+            _db.SaveChanges();
+        }
+    }
+}
+
+4.go to ConfigureServices method in the Startup class and add this line of code
+services.AddScoped<IProductsRepository, ProductsRepository>();
+
+5.now we can call on the repositroy in the controller instead of the DB object
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing.Internal;
+using Microsoft.EntityFrameworkCore;
+using RestApiMainProject.Data;
+using RestApiMainProject.Models;
+using RestApiMainProject.Services;
+
+namespace RestApiMainProject.Controllers
+{
+    [Produces("application/json")]
+    [Route("api/Products")]
+    public class ProductsController : Controller
+    {
+        private readonly IProductsRepository _productsRepository;
+
+        public ProductsController(IProductsRepository productsRepository)
+        {
+            _productsRepository = productsRepository;
+        }
+        // GET: api/Products
+        [HttpGet]
+        public IEnumerable<Product> Get(string sortPrice)
+        {
+           return _productsRepository.GetProducts();
+        }
+
+        // GET: api/Products/5
+        [HttpGet("{id}", Name = "Get")]
+        public async Task<IActionResult> Get(int id)
+        {
+            var product = _productsRepository.GetProduct(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+            return Ok(product);
+        }
+        
+        // POST: api/Products
+        [HttpPost]
+        public IActionResult Post([FromBody]Product product)
+        {
+            _productsRepository.AddProduct(product);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            return Ok("New item stored!");
+
+        }
+        
+        // PUT: api/Products/5
+        [HttpPut("{id}")]
+        public IActionResult Put(int id, [FromBody]Product product)
+        {
+            _productsRepository.UpdateProduct(id,product);
+            return Ok("Item updated!");
+        }
+        
+        // DELETE: api/ApiWithActions/5
+        [HttpDelete("{id}")]
+        public IActionResult Delete(int id)
+        {
+            _productsRepository.DeleteProduct(id);
+            return Ok("Item deleted!");
+
+        }
+    }
+}
+

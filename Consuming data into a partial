@@ -1,0 +1,72 @@
+1. in the shared folder create a view and make sure you set it to partial. 
+2.with the partial view, a controller/model will be provided
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace CarsByRuss.Models
+{
+    public class IndividualButtonPartial
+    {
+        //below we delcare and set the custom fields for the link we will be using 
+        public string ButtonType { get; set; }
+        public string Action { get; set; }
+        public string Text { get; set; }
+        public int? ServiceId { get; set; }
+        public string ActionParameters
+        {
+            get
+            {
+                var param = new StringBuilder(@"/");
+                if (ServiceId != 0 && ServiceId != null)
+                {
+                    param.Append(String.Format("{0}", ServiceId));
+                }
+
+                return param.ToString().Substring(0, param.Length);
+            }
+        }
+    }
+}
+
+3.now we switch from the model/controller to the view, now we will use the properties from above and place them within our link
+@model CarsByRuss.Models.IndividualButtonPartial
+<a type="button" class="btn btn-sm @Model.ButtonType" href="@Url.Action(Model.Action)@Model.ActionParameters">
+    <span>@Model.Text</span>
+</a>
+4. Now we will consume our custom partial link into another partial, give the fields values and we will be ready to place it into the main view
+@model CarsByRuss.Models.IndividualButtonPartial
+<td style="width: auto;">
+    <div class="btn-group pull-right" role="group">
+        @Html.Partial("_IndividualButtonPartial",
+            new IndividualButtonPartial
+            {
+                Action = "Edit",
+                ButtonType = "btn-primary",
+                Text = "Edit",
+                ServiceId = Model.ServiceId
+            })
+        @Html.Partial("_IndividualButtonPartial",
+            new IndividualButtonPartial
+            {
+                Action = "Details",
+                ButtonType = "btn-success",
+                Text = "Details",
+                ServiceId = Model.ServiceId
+            })
+        @Html.Partial("_IndividualButtonPartial",
+            new IndividualButtonPartial
+            {
+                Action = "Delete",
+                ButtonType = "btn-danger",   
+                Text = "Delete",
+                ServiceId = Model.ServiceId
+            })
+    </div>
+</td>
+5.Main view
+ <td>
+     @Html.Partial("_TableButtonPartial", new IndividualButtonPartial {ServiceId = @item.ID});
+ </td>

@@ -1,0 +1,6 @@
+in launchSettings.json ctrl f and search for profiles. You will see launchBrowser, you can set this to false while testing with 
+Postman, this is optional. 
+
+in launchSettings.json ctrl f and search for applicationUrl, this will be the address your SPA will need to call on
+http://localhost:51367/ then go to your contoroller and look at the top for Route  [Route("api/Products")] combined,
+these two values will be the final URL needed to call your API http://localhost:51366/api/Products
