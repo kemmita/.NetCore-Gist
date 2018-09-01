@@ -1,0 +1,80 @@
+1. Create a project
+C:\Users\Russell>cd c:/
+
+c:\>mkdir Demo
+
+c:\>cd Demo
+
+c:\Demo>mkdir DatingApp
+
+c:\Demo>cd DatingApp
+
+// "webapi" is just one of many choices to choose from, we could choose Angular, React, MVC, or something else if we choose to.
+c:\Demo\DatingApp>dotnet new webapi -o DatingApp.API -n DatingApp.API
+
+
+c:\Demo\DatingApp>cd DatingApp.API
+
+c:\Demo\DatingApp\DatingApp.API>
+
+
+PS C:\Demo\DatingApp\DatingApp.API> $env:ASPNETCORE_ENVIRONMENT = "Development"
+
+2. Using Entity framework in the cli to create and alter your DB.
+
+First we need to install the Enity Framework package and thise command will not work in Visual Studio only in the command line.
+Run command "dotnet add package Microsoft.EntityFrameworkCore.SqlServer" then run command "dotnet restore"
+
+Then in the .csproj file we need to manually add an Item Group, place it around line 19.
+<ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.EntityFrameworkCore.Tools.DotNet" Version="2.0.0" />
+</ItemGroup>
+
+Then run command "dotnet restore"
+
+Now we need to set up our db context. Inside of the Models directory, create a new class called MyDbContext. Below is the code for that class
+
+using Microsoft.EntityFrameworkCore;
+
+namespace packt2.Models
+{
+    public class MyDbContext : DbContext
+    {
+        public MyDbContext(DbContextOptions<MyDbContext> options) : base(options)
+        {
+         
+        }
+        // Now inlude our DbSets
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet <Product> Products { get; set; }
+        public DbSet <ProductCategory> ProductCategories { get; set; }
+        public DbSet <Sale> Sales { get; set; }
+        public DbSet <Stock> Stocks { get; set; }
+    }
+}
+
+Now head over to Startup.cs and add a service to ConfigureServices
+
+    public void ConfigureServices(IServiceCollection services)
+        {
+            // We include our DbContext here and our connection string which is defined in apssettings.json, see the next step for more details
+            services.AddDbContext<MyDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddMvc();
+        }
+
+Below is the appsettings.json file
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=DESKTOP-6DG4N32\\SQLEXPRESS;Database=packttwo;User ID=root; Password=password;"
+  }
+}
+
+
+
