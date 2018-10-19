@@ -35,3 +35,56 @@ public DbSet<Service> Services { get; set; }
 4.then run add-migration and then update-database
 
 
+5. Another example.
+6. First create the new model
+ public class MenuItem
+    {
+        [Required]
+        public int  Id { get; set; }
+        [Required]
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Image { get; set; }
+        public string Spicyness { get; set; }
+        public enum ESpicy{NA=0, Spicy=1, VerySpicy=2}
+        [Range(1,int.MaxValue,ErrorMessage = "Price should be greater than ${1}")]
+        public double Price { get; set; }
+
+        //Create foreign keys
+        //Foreign Key 1
+        [Display(Name = "Category")]
+        public int CategoryId { get; set; }
+        [ForeignKey("CategoryId")]
+        public virtual Category Category{ get; set; }
+        //Foreign Key 2
+        [Display(Name = "Sub Category")]
+        public int SubCategoryId { get; set; }
+        [ForeignKey("SubCategoryId")]
+        public virtual SubCategory SubCategory { get; set; }
+
+    }
+    
+    7. Go to ApplicationDBcontext and add the dbset
+     public DbSet<MenuItem> MenuItems { get; set; }
+     
+   8. Run update-database and you will then see how the code above generated foreign keys in the db
+           constraints: table =>
+                {
+                    table.PrimaryKey("PK_MenuItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MenuItems_Categories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalTable: "Categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.NoAction);
+                    table.ForeignKey(
+                        name: "FK_MenuItems_SubCategories_SubCategoryId",
+                        column: x => x.SubCategoryId,
+                        principalTable: "SubCategories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.NoAction);
+                });
+     9. You can also recieve an error "ON DELETE CASCADE" when you run update-database, if that happens replace 
+     onDelete: ReferentialAction.Cascade); with onDelete: ReferentialAction.NoAction);
+     10. Now run update-database
+
