@@ -20,6 +20,8 @@ c:\Demo\DatingApp\DatingApp.API>
 
 PS C:\Demo\DatingApp\DatingApp.API> $env:ASPNETCORE_ENVIRONMENT = "Development"
 
+**IMPORTANT with cli the default path is http://localhost:5000/api/examplecontroller
+
 2. Using Entity framework in the cli to create and alter your DB.
 
 First we need to install the Enity Framework package and thise command will not work in Visual Studio only in the command line.
