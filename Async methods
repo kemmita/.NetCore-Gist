@@ -1,7 +1,0 @@
-1. Being able to use Asynchronis programming is usefull when dealing with a lot of trafic
-2. Below we use Async with our Index Action
-
-        public async Task<IActionResult> Index()
-        {
-            return View(await _db.Categories.ToListAsync()); //we can use await in the return View method
-        }
