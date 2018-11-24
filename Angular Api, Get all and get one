@@ -1,0 +1,87 @@
+1. After creating the API, go into Startup.cs and add cors to our application.
+
+ public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services.AddCors();
+        }
+ 
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseHsts();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+            app.UseMvc();
+        }
+ 
+2. Inisde of app.moules.ts we will need to add HttpClientModule to our imports
+
+import {HttpClientModule} from '@angular/common/http';
+ imports: [
+    BrowserModule,
+    HttpClientModule
+  ],
+  
+3. Now Generate a new compononent in Angular, we will call our shops
+
+//shops.ts
+
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Component({
+  selector: 'app-shops',
+  templateUrl: './shops.component.html',
+  styleUrls: ['./shops.component.css']
+})
+export class ShopsComponent implements OnInit {
+  shops: any;
+  shop: any;
+  
+  // Use dp injection to call on the httpclient
+  constructor(private http: HttpClient) { }
+
+  // Load functions oninit
+  ngOnInit() {
+    this.getShops();
+    this.getShop();
+  }
+  getShops() {
+    // Use the http get method from the httpclient we injected, supply the url to the api, subscribe to thr response of the function
+    and set the response to the shops var you created above. Make sure to set you shops var above to any as you will most likely
+    recieve an array 
+    this.http.get('https://localhost:44366/api/shops').subscribe(response => {
+      this.shops = response;
+    }, error => {
+      console.log(error);
+    });
+  }
+  getShop() {
+    this.http.get('https://localhost:44366/api/shops/' + 1).subscribe(response => {
+      this.shop = response;
+    }, error => {
+      console.log(error);
+    });
+  }
+
+}
+
+4. Now in your components html, call on the data fetched in the ts file
+
+<ul *ngFor="let s of shops">
+  <li><a href="" (click)="getShop(s.id)">{{s.name}}</a></li>
+  <li>{{s.address}}</li>
+</ul>
+
+<p>{{shop.name}}</p>
