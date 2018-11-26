@@ -1,0 +1,39 @@
+0. In order for the authentication middleware to work, we will need to have created tokens with the login method, to make sure you have a
+register and login method, visit REST API register and login before doing this.
+
+1. First head over to Startup.cs to add the middleware to our ConfigureServices method.
+
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services.AddCors();
+            services.AddScoped<IAuthRepository, AuthRepository>();
+            // Below is where we add the authentication
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer
+                (options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey =
+                        new SymmetricSecurityKey(
+                            Encoding.ASCII.GetBytes(Configuration.GetSection("AppSettings:Token").Value)),
+                    ValidateIssuer = false,
+                    ValidateAudience = false
+                };
+            });
+        }
+ 
+ 2. Now in the controller implement Authorize
+ 
+       // We will need a token to access this action we could set [Authorize] above our class decleration and this would make every
+       method in the controller inaccessible to non authorized users. 
+        [Authorize]
+        [HttpGet]
+        public ActionResult<IEnumerable<string>> Get()
+        {
+            return new string[] { "value1", "value2" };
+        }
