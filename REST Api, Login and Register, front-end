@@ -1,0 +1,131 @@
+**Before** If you want to see how to switch from login to logout within angular for this particular scenario, please go to the 
+Angular Gist and look at file "using a behavior subject to conditionally set Login and Logout"
+
+1. Go into app.module.ts and ensure that FormsModule and  HttpClientModule is included. 
+
+import {FormsModule} from '@angular/forms';
+
+  imports: [
+    BrowserModule,
+    HttpClientModule,
+    FormsModule
+  ],
+
+2. Create a services directory in the app directory and create a fille titled auth.services.ts. once generated, ensure that it was 
+added to app.modules.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import {map} from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+//Point to our backend
+baseUrl = 'https://localhost:44366/api/auth/';
+
+constructor(private http: HttpClient) {}
+
+//for both login and register method, we use the injected httpclient to make calls to the api.
+login(model: any) {
+  return this.http.post(this.baseUrl + 'login', model).pipe(
+    map((response: any) => {
+      const user = response;
+      if (user) {
+        localStorage.setItem('token', user.token);
+      }
+    })
+  );
+}
+
+register(model: any) {
+  return this.http.post(this.baseUrl + 'register', model);
+}
+}
+
+3. Now create a register component, we will use template forms from the form module imported above.
+
+**html**
+ <form #registerForm="ngForm" class="form-signin" (ngSubmit)="register()">
+                      <div class="form-group">
+                         <label class="text-center col-md-12">Username</label>
+                         <div class="col-md-6 m-auto">
+                            <div class="input-group"><span class="input-group-addon"><i class="glyphicon glyphicon-user"></i></span><input id="username" name="username" placeholder="Username" [(ngModel)]="model.username" class="form-control"  required="true" value="" type="text"></div>
+                         </div>
+                      </div>
+                      <div class="form-group">
+                         <label class="col-md-12 text-center control-label">Password</label>
+                         <div class="col-md-6 m-auto inputGroupContainer">
+                            <div class="input-group"><span class="input-group-addon"><i class="glyphicon glyphicon-home"></i></span><input id="password" name="password" placeholder="Password" class="form-control" required="true" value="" type="password" [(ngModel)]="model.password"></div>
+                         </div>
+                      </div>
+                      <div class="form-group text-center">
+                           <button [disabled]="!registerForm.valid" class="btn btn-light mt-2" type="submit"><strong class="p-5">Register</strong></button>
+                      </div>
+  </form>
+  
+  **ts**
+  import { Component, OnInit } from '@angular/core';
+import { AuthService } from '../services/auth.service';
+
+@Component({
+  selector: 'app-register',
+  templateUrl: './register.component.html',
+  styleUrls: ['./register.component.css']
+})
+export class RegisterComponent implements OnInit {
+  model: any = {};
+  constructor(private authService: AuthService) { }
+  ngOnInit() {
+  }
+  //  We inject the auth.service in our constructor and call on the appropriate method.
+  register() {
+    this.authService.register(this.model).subscribe(next => {
+        console.log('Signed Up!');
+      }, error => {
+        console.log('Failed to sign up');
+      });
+  }
+}
+
+4. Now lets create the Login component
+
+**html**
+   <form #loginForm="ngForm" class="form-signin" (ngSubmit)="login()">
+            <span id="reauth-email" class="reauth-email"></span>
+            <input type="email" class="form-control mt-1 mb-3" placeholder="Username" name="username" required autofocus [(ngModel)]="model.username">
+            <input type="password"  class="form-control mt-3 mb-3" placeholder="Password" name="password" required [(ngModel)]="model.password">
+            <button [disabled]="!loginForm.valid" class="mt-3 mb-2 btn btn-lg btn-primary btn-block btn-signin" type="submit">Login</button>
+   </form>
+   
+   **ts**
+   import { Component, OnInit, Output, EventEmitter, Input } from '@angular/core';
+import { connectableObservableDescriptor } from 'rxjs/internal/observable/ConnectableObservable';
+import { AuthService } from '../services/auth.service';
+import { LoginconditionService } from '../services/logincondition.service';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.css']
+})
+export class LoginComponent implements OnInit {
+  // the values passed in from the form must be passed in as objects. So lets create an empty object below
+  model: any = {};
+  loggedIn: boolean;
+  constructor(private authService: AuthService, private loginCondition: LoginconditionService) { }
+  ngOnInit() {
+    this.loginCondition.currentLoggedInStatus.subscribe(login => this.loggedIn = login);
+  }
+  login() {
+    this.authService.login(this.model).subscribe(next => {
+      console.log('Logged in successfully');
+      this.loginCondition.changeLoggedInStatus(true);
+      const token = localStorage.getItem('token');
+    }, error => {
+      console.log('Failed to login');
+    });
+  }
+}
+  
