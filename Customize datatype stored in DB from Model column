@@ -1,0 +1,9 @@
+1. The below column would have been declared as nvarcharMAX, and we do not need that much so we use column and Typename to rename the datatype.
+
+```cs 
+    public class ApplicationUser : IdentityUser
+    {
+        [Column(TypeName = ("nvarchar(150)"))]
+        public string FullName { get; set; }
+    }
+```
