@@ -69,3 +69,52 @@ namespace API.Controllers
     }
 }
 ```
+5. READ ONE! 
+```cs
+public class ActivityDetail
+    {
+        //specify what param is expected to be passed for this Query
+        public class Query : IRequest<Activity>
+        {
+            public Guid Id { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Query, Activity>
+        {
+            private readonly ApplicationDbContext _db;
+
+            public Handler(ApplicationDbContext db)
+            {
+                _db = db;
+            }
+            //using Query defined above wih a param Id of type Guid, we will locate a single activity in the db associated with the Guid id.
+            public async Task<Activity> Handle(Query request, CancellationToken cancellationToken)
+            {
+                return await _db.Activities.FindAsync(request.Id);
+            }
+        }
+    }
+```
+6. Lastly, in our controller create a new action and send a Query to the handle method defined above.
+```cs
+namespace API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ActivitiesController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+        public ActivitiesController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+        
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Activity>> GetActivityDetails(Guid id)
+        {
+            return await _mediator.Send(new ActivityDetail.Query{Id = id});
+        }
+    }
+}
+```
+
