@@ -117,4 +117,207 @@ namespace API.Controllers
     }
 }
 ```
+7. **CREATE** Below we will create a new activity. Create a new class in your Application/Activities direcotry titled "CreateActivity"
+```cs
+ public class CreateActivity
+    {
+        //this time we have a command instead of a query and we must specify the values that will be passed in the command
+        public class Command : IRequest
+        {
+            public Guid Id { get; set; }
+            public string Title { get; set; }
+            public string Description { get; set; }
+            public string Category { get; set; }
+            public string City { get; set; }
+            public string Venue { get; set; }
+            public DateTime Date { get; set; }
+        }
 
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly ApplicationDbContext _db;
+            public Handler(ApplicationDbContext db)
+            {
+                _db = db;
+            }
+            //since we are writing a command, a "POST" we will not be returning data, but storing data.
+            //so this time our task will return a type of unit, which is simply an int
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                var activity = new Activity
+                {
+                    Id = request.Id,
+                    Title = request.Title,
+                    Description = request.Description,
+                    Category = request.Category,
+                    City = request.City,
+                    Venue = request.Venue,
+                    Date = request.Date,
+                };
+
+                _db.Activities.Add(activity);
+                
+                //to ensure that the data was stored correctly, check that unit is greater than 0
+                var success = await _db.SaveChangesAsync() > 0;
+
+                if (success)
+                {
+                    return Unit.Value;
+                }
+
+                throw new Exception("Problem saving new activity");
+            }
+        }
+    }
+```
+8. Controller
+```cs
+ [Route("api/[controller]")]
+    [ApiController]
+    public class ActivitiesController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+        public ActivitiesController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+
+         //again we return a unit. notice that we are not specifing a type of Activity in the param field, but a 
+         //CreateActivity.Command which we assigned the value of type Activity in the class above.
+        [HttpPost("")]
+        public async Task<ActionResult<Unit>> Create(CreateActivity.Command command)
+        {
+            return await _mediator.Send(command);
+        }
+    }
+```
+9. **UPDATE** Create a new class in your Application/Activities direcotry titled "CreateActivity"
+```cs
+ public class EditActivity
+    {
+        /define the values that will be passed in
+        public class Command : IRequest
+        {
+            public Guid Id { get; set; }
+            public string Title { get; set; }
+            public string Description { get; set; }
+            public string Category { get; set; }
+            public string City { get; set; }
+            public string Venue { get; set; }
+            public DateTime? Date { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly ApplicationDbContext _db;
+            public Handler(ApplicationDbContext db)
+            {
+                _db = db;
+            }
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                var activity = await _db.Activities.FindAsync(request.Id);
+
+                if (activity == null)
+                {
+                    throw new Exception("Could not locate that activity");
+                }
+                else
+                {
+                    activity.Title = request.Title ?? activity.Title;
+                    activity.Description = request.Description ?? activity.Description;
+                    activity.Category = request.Category ?? activity.Category;
+                    activity.City = request.City ?? activity.City;
+                    activity.Venue = request.Venue ?? activity.Venue;
+                    activity.Date = request.Date ?? activity.Date;
+
+                    var success = await _db.SaveChangesAsync() > 0;
+                    if (success)
+                    {
+                        return Unit.Value;
+                    }
+                    throw new Exception("Problem saving changes");
+                }
+
+            }
+        }
+    }
+```
+10. Controller
+```cs
+   [Route("api/[controller]")]
+    [ApiController]
+    public class ActivitiesController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+        public ActivitiesController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+        
+        //below we see how to pass in the id needed to update a specific activity 
+        [HttpPut("{id}")]
+        public async Task<ActionResult<Unit>> Update(Guid id, EditActivity.Command command)
+        {
+            command.Id = id;
+            return await _mediator.Send(command);
+        }
+    }
+```
+11. **DELETE** Create a new class in your Application/Activities direcotry titled "DeleteActivity"
+```cs
+ public class DeleteActivity
+    {
+        //define the command param that will be needed to locate the individual activity
+        public class Command : IRequest
+        {
+            public Guid Id { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly ApplicationDbContext _db;
+            public Handler(ApplicationDbContext db)
+            {
+                _db = db;
+            }
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                var activity = await _db.Activities.FindAsync(request.Id);
+
+                if (activity == null)
+                {
+                    throw new Exception("Could not locate that activity");
+                }
+
+                _db.Remove(activity);
+
+                var success = await _db.SaveChangesAsync() > 0;
+                if (success)
+                {
+                    return Unit.Value;
+                }
+                throw new Exception("Problem saving changes");
+            }
+        }
+    }
+```
+12. Controller
+```cs
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ActivitiesController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+        public ActivitiesController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<ActionResult<Unit>> Delete(Guid id)
+        {
+            return await _mediator.Send(new DeleteActivity.Command{Id = id});
+        }
+    }
+```
