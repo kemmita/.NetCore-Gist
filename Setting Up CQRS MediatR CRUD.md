@@ -69,6 +69,76 @@ namespace API.Controllers
     }
 }
 ```
+4.0. Calling the data and using it in React. First create an interfcae of the data that we will be recieving from our API
+```ts
+export interface IActivity {
+    id: string,
+    title: string,
+    description: string,
+    category: string,
+    date: Date,
+    city: string,
+    venue: string
+}
+```
+4.1. In our main App component, we will make the call to the API using axios, we will then use hooks to set the state.
+```ts
+import React, { useState, useEffect, Fragment } from 'react';
+import axios from 'axios';
+import {IActivity} from "../Interfaces/activity";
+import ActivityDashboard from "../../features/activities/dashboard/ActivityDashboard";
+
+const App = () => {
+  //below we use the state hook to set the initial state of activities to an empty array of IActivityarray
+  const [activities, setActivities] = useState<IActivity[]>([]);
+
+  useEffect (() =>{
+          //below we specify the type the get call should return.
+          axios.get<IActivity[]>('https://localhost:44396/api/activities').then(response => {
+          //we then use our hook method to set the state of the actitivies.
+             setActivities(response.data);
+          });
+  }, []);
+
+    return (
+        <Fragment>
+            <Container style={{marginTop: '7em'}}>
+            //below we pass our activities to our child component.
+            <ActivityDashboard activities={activities} />
+            </Container>
+        </Fragment>
+    );
+};
+
+export default App;
+```
+4.2. laslty we use our child component to display the activities list
+```ts
+import React from 'react';
+import {IActivity} from "../../../app/Interfaces/activity";
+
+//inorder to accept the props passed down to us, we need to create an interface IProps with the type of data
+//that will be passed in
+interface IProps {
+    activities: IActivity[]
+}
+
+//use the interface here
+const ActivityDashboard: React.FC<IProps> = (props) => {
+    return (
+        <Grid>
+            <Grid.Column width={10}>
+                <List>
+                     //here will finally have access to the activities.
+                    {props.activities.map((activity) => (<List.Item key={activity.id}>{activity.title}</List.Item>))}
+                </List>
+            </Grid.Column>
+        </Grid>
+    );
+};
+
+export default ActivityDashboard;
+```
 5. READ ONE! 
 ```cs
 public class ActivityDetail
