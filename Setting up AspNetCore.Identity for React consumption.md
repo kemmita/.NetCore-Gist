@@ -16,7 +16,7 @@ namespace Domain
     }
 }
 ```
-2.1 Create a UserObject in the Application Lib so that we do not return all 10+ props returned when fetching the AppUser from the db.
+2.1 Create a UserObject in the Application Project so that we do not return all 10+ props returned when fetching the AppUser from the db.
 ```cs
    public class User
     {
@@ -26,7 +26,7 @@ namespace Domain
         public string Image { get; set; }
     }
 ```
-3. In our persistence lib, we will need to alter our ApplicationDbContext file a bit. Instead of inheriting from DbContext, we will
+3. In our persistence proeject, we will need to alter our ApplicationDbContext file a bit. Instead of inheriting from DbContext, we will
 inherit from IdentityDbContext<AppUser> ensure to include the name of the user model, the one we craetd above.
 ```cs
 public class ApplicationDbContext: IdentityDbContext<AppUser>
@@ -77,7 +77,7 @@ update-database // may be uper case, I don't fucking know!
             services.AddAuthentication();
         }
 ```
-6. We will now seed our database with test users. 
+6. We will now seed our database with test users. This will be done in the persistence project, file Seed.cs 
 ```cs
     public class Seed
     {
@@ -139,4 +139,5 @@ and since the static method is async and the main method of the progrma is not, 
             host.Run();
         }
 ```
-8. 
+8. Add a new "project/class library", "Infrastructure" this lib will be responsible for handling JWT related jobs.
+
