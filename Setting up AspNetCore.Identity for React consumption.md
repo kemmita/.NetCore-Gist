@@ -48,9 +48,10 @@ public class ApplicationDbContext: IdentityDbContext<AppUser>
 add-migration AddIdentity -p Persistence -s API
 update-database // may be uper case, I don't fucking know!
 ```
-5. In our Startup class make the following addtions
+5. In our Startup class make the following addtions U may see some erros, and that is okay as we will be adding in the dependencies
+later below
 ```cs
-    public void ConfigureServices(IServiceCollection services)
+            public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<ApplicationDbContext>(opt =>
                 {
@@ -64,17 +65,52 @@ update-database // may be uper case, I don't fucking know!
                     });
             });
             services.AddMediatR(typeof(ActivitiesList.Handler).Assembly);
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2).AddFluentValidation(cfg =>
+            services.AddMvc(options =>
+            {
+                var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+                options.Filters.Add(new AuthorizeFilter(policy));
+            }).SetCompatibilityVersion(CompatibilityVersion.Version_2_2).AddFluentValidation(cfg =>
                 {
                     cfg.RegisterValidatorsFromAssemblyContaining<CreateActivity>();
                 });
-                
-            //Everything under here is identity related   
             var builder = services.AddIdentityCore<AppUser>();
             var identityBuilder = new IdentityBuilder(builder.UserType, builder.Services);
             identityBuilder.AddEntityFrameworkStores<ApplicationDbContext>();
             identityBuilder.AddSignInManager<SignInManager<AppUser>>();
-            services.AddAuthentication();
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Super Secret Key"));
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateAudience = false,
+                    ValidateIssuer = false
+                };
+            });
+            services.AddScoped<IJwtGenerator, JwtGenerator>();
+            services.AddScoped<IUserAccessor, UserAccessor>();
+        }
+        
+        
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            app.UseMiddleware<ErrorHandlingMiddleware>();
+            if (env.IsDevelopment())
+            {
+                //app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                //app.UseHsts();
+            }
+
+            //app.UseHttpsRedirection();
+            app.UseCors("CorsPolicy");
+            app.UseAuthentication();
+            app.UseMvc();
         }
 ```
 6. We will now seed our database with test users. This will be done in the persistence project, file Seed.cs 
@@ -139,5 +175,285 @@ and since the static method is async and the main method of the progrma is not, 
             host.Run();
         }
 ```
-8. Add a new "project/class library", "Infrastructure" this lib will be responsible for handling JWT related jobs.
-9. 
+8. Add a new "project/class library", "Infrastructure" this lib will be responsible for handling Security related jobs.
+9. Create a new directory securty and within place a new class titled JWT Generator. we will create the IJwtGenerator interfcae later
+```cs
+  public class JwtGenerator : IJwtGenerator
+    {
+        public string CreateToken(AppUser user)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.NameId, user.UserName)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Super Secret Key"));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.Now.AddDays(7),
+                SigningCredentials = creds
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+
+            return tokenHandler.WriteToken(token);
+        }
+    }
+```
+10. In the same security directory create a new class UserAccessor to fetch the current username concealed in the token after a user
+logs in. IUserAccess is Created below
+```cs
+ public class UserAccessor : IUserAccessor
+    {
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public UserAccessor(IHttpContextAccessor httpContextAccessor)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
+        public string GetCurrentUsername()
+        {
+            var username = _httpContextAccessor.HttpContext.User?.Claims
+                ?.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+            return username;
+        }
+    }
+```
+11. Now in the application lib, create a new direcotry for interfaces and create the IJwtGenerator interface. In the program class
+above, we have already set up DI for this interface and its concrete implementation defined above "JwtGenerator"
+```cs
+using Domain;
+
+namespace Application.Interfaces
+{
+    public interface IJwtGenerator
+    {
+        string CreateToken(AppUser user);
+    }
+}
+```
+12. Now create the IUserAccessor Interface. DI was done in the program class above already
+```cs
+namespace Application.Interfaces
+{
+    public interface IUserAccessor
+    {
+        string GetCurrentUsername();
+    }
+}
+```
+13. In the application lib in User directory we will create the Register Handler
+```cs
+    public class Register
+    {
+        public class Command : IRequest<User>
+        {
+            public string DisplayName { get; set; }
+            public string Username { get; set; }
+            public string Email { get; set; }
+            public string Password { get; set; }
+        }
+        public class Handler : IRequestHandler<Command, User>
+        {
+            private readonly ApplicationDbContext _db;
+            private readonly UserManager<AppUser> _userManager;
+            private readonly IJwtGenerator _jwtGenerator;
+            public Handler(ApplicationDbContext db, UserManager<AppUser> userManager, IJwtGenerator jwtGenerator)
+            {
+                _db = db;
+                _userManager = userManager;
+                _jwtGenerator = jwtGenerator;
+            }
+
+            public async Task<User> Handle(Command request, CancellationToken cancellationToken)
+            {
+                if (await _db.Users.AnyAsync(u => u.Email == request.Email))
+                {
+                    throw new RestException(HttpStatusCode.BadRequest, new {Email = "Email Already Exists"});
+                }
+
+                if (await _db.Users.AnyAsync(u => u.UserName == request.Username))
+                {
+                    throw new RestException(HttpStatusCode.BadRequest, new { Username = "Username Already Exists" });
+                }
+
+                var user = new AppUser
+                {
+                    DisplayName = request.DisplayName,
+                    Email = request.Email,
+                    UserName = request.Username
+                };
+
+                var results = await _userManager.CreateAsync(user, request.Password);
+
+                if (results.Succeeded)
+                {
+                    return new User
+                    {
+                        DisplayName = user.DisplayName,
+                        Token = _jwtGenerator.CreateToken(user),
+                        Username = user.UserName,
+                        Image = null
+                    };
+                }
+
+                throw new Exception("Problem registering user.");
+            }
+        }
+    }
+```
+14. Now Create the Registration Validator in the Validator directory in app lib
+```cs
+{
+    public class RegistrationValidator : AbstractValidator<Register.Command>
+    {
+        public RegistrationValidator()
+        {
+            RuleFor(x => x.Username).NotEmpty().WithMessage("Username Required");
+            RuleFor(x => x.DisplayName).NotEmpty().WithMessage("DisplayName Required");
+            RuleFor(x => x.Email).NotEmpty().WithMessage("Email Required").EmailAddress().WithMessage("Valid Email Required");
+            RuleFor(x => x.Password).NotEmpty().WithMessage("Password Required")
+                .MinimumLength(6).WithMessage("Password Min Length Is 6 Characters")
+                .Matches("[A-Z]").WithMessage("Password Must Contain An Upper Case Letter")
+                .Matches("[a-z]").WithMessage("Password Must Contain A Lower Case Letter")
+                .Matches("[0-9]").WithMessage("Password Must Contain A Number")
+                .Matches("[^a-zA-Z0-9]").WithMessage("Password Must Contain A Special Character");
+        }
+    }
+```
+15. Now lets cerate the login handler
+```cs
+  public class Login
+    {
+        //specify what param is expected to be passed for this Query
+        public class Query : IRequest<User>
+        {
+            public string Email { get; set; }
+            public string Password { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Query, User>
+        {
+            private readonly UserManager<AppUser> _userManager;
+            private readonly SignInManager<AppUser> _signInManager;
+            private readonly IJwtGenerator _jwtGenerator;
+
+            public Handler(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, IJwtGenerator jwtGenerator)
+            {
+                _userManager = userManager;
+                _signInManager = signInManager;
+                _jwtGenerator = jwtGenerator;
+            }
+            //using Query defined above wih a param Id of type Guid, we will locate a single activity in the db associated with the Guid id.
+            public async Task<User> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var user = await _userManager.FindByEmailAsync(request.Email);
+
+                if (user == null)
+                {
+                    throw new RestException(HttpStatusCode.Unauthorized);
+                }
+
+                var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
+
+                if (result.Succeeded)
+                {
+                    // Return Token
+                    return new User
+                    {
+                        DisplayName = user.DisplayName,
+                        Image = null,
+                        Token = _jwtGenerator.CreateToken(user),
+                        Username = user.UserName
+                    };
+                }
+                else
+                {
+                    throw new RestException(HttpStatusCode.Unauthorized);
+                }
+            }
+        }
+    }
+```
+16. Create the Login validator
+```cs
+    public class LoginValidator : AbstractValidator<Login.Query>
+    {
+        public LoginValidator()
+        {
+            RuleFor(x => x.Email).NotEmpty().WithMessage("Email Required");
+            RuleFor(x => x.Password).NotEmpty().WithMessage("Password Required");
+        }
+    }
+```
+17. Create the Current User handler to return the user who is currently signed in.
+```cs
+    public class CurrentUser
+    {
+        public class Query : IRequest<User> { }
+
+        public class Handler : IRequestHandler<Query, User>
+        {
+            private readonly UserManager<AppUser> _userManager;
+            private readonly IUserAccessor _userAccessor;
+            private readonly IJwtGenerator _jwtGenerator;
+
+            public Handler(UserManager<AppUser> userManager, IUserAccessor userAccessor, IJwtGenerator jwtGenerator)
+            {
+                _userManager = userManager;
+                _userAccessor = userAccessor;
+                _jwtGenerator = jwtGenerator;
+            }
+
+            public async Task<User> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var user = await _userManager.FindByNameAsync(_userAccessor.GetCurrentUsername());
+
+                return new User
+                {
+                    DisplayName = user.DisplayName,
+                    Username = user.UserName,
+                    Token = _jwtGenerator.CreateToken(user),
+                    Image = null
+                };
+            }
+        }
+    }
+```
+18. Lastly Create the User Controller
+```cs
+    [Route("api/[controller]")]
+    [ApiController]
+    public class UserController : BaseController
+    {
+        private readonly IMediator _mediator;
+        public UserController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+
+        [AllowAnonymous]
+        [HttpPost("login")]
+        public async Task<ActionResult<User>> Login(Login.Query query)
+        {
+           return await _mediator.Send(new Login.Query {Email = query.Email, Password = query.Password});
+        }
+
+        [AllowAnonymous]
+        [HttpPost("Register")]
+        public async Task<ActionResult<User>> Register(Register.Command command)
+        {
+            return await _mediator.Send(command);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<User>> CurrentUser()
+        {
+            return await Mediator.Send(new CurrentUser.Query());
+        }
+    }
+```
