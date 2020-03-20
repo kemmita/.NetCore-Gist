@@ -1,9 +1,0 @@
- static void Main(string[] args)
-        {
-            var context = new PlutoContext();
-            //this will display the exact number of cousrses that are listed under level 1
-            //we achieved this by chaining the Linq Extension Methods together
-            var count = context.Courses.Where(c => c.Level.Equals(1)).Count();
-            Console.WriteLine(count);
-            Console.ReadKey();
-        }
