@@ -2,7 +2,6 @@
 ```
 Microsoft.EntityFrameworkCore
 Microsoft.EntityFrameworkCore.SqlServer
-Microsoft.EntityFrameworkCore.Proxies
 AutoMapper.Extensions.Microsoft.DependencyInjection
 Microsoft.AspNetCore.Mvc.NewtonsoftJson
 ```
@@ -104,6 +103,57 @@ Below is the call to the db.
         {
            //we use the include method to return the UserPay table data associated with our user
             var user = await _db.Users.Include(x => x.Payment).FirstAsync(x => x.Username == "Jane");
+
+            return _mapper.Map<User, UserPayInfoDto>(user);
+        }
+```
+9. Now we will look at using Lazy Loading lets install the packages we will need
+```
+Microsoft.EntityFrameworkCore.Proxies
+```
+10. We will need to modify our startup.cs file abit
+```cs
+ public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddAutoMapper(typeof(WeatherForecast).Assembly);
+            services.AddDbContext<ApplicationDbContext>(opt =>
+            {
+                opt.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")).UseLazyLoadingProxies();
+            });
+            services.AddControllers().AddNewtonsoftJson(options =>
+                options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+            );
+        }
+```
+11. Now update our applicationDbContext
+```cs
+  protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseLazyLoadingProxies();
+        }
+```
+12. Now update our models to include the virtual keyword
+```cs
+ public class User
+    {
+        public int Id { get; set; }
+        public string Username { get; set; }
+        public virtual UserPay Payment { get; set; }
+    }
+    
+      public class UserPay
+    {
+        public int Id { get; set; }
+        public string CreditCardNumber { get; set; }
+        public virtual User User { get; set; }
+    }
+```
+13. Now we no longer need to use the inlcude key word! The potential downfall of this, is that our related payment prop will always be returned 
+```cs
+[HttpGet]
+        public async Task<ActionResult<UserPayInfoDto>> Get()
+        {
+            var user = await _db.Users.FirstAsync(x => x.Username == "Jane");
 
             return _mapper.Map<User, UserPayInfoDto>(user);
         }
