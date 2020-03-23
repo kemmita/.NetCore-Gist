@@ -13,7 +13,8 @@ in the ConfigureServices method.
             {
                 opt.AddPolicy("CorsPolicy", policy =>
                     {
-                        policy.AllowAnyHeader().AllowAnyMethod().WithOrigins("http://localhost:3000");
+          //We needed to append the AllowCredentials, for the token to be sent correctly to the hub.                    
+                        policy.AllowAnyHeader().AllowAnyMethod().WithOrigins("http://localhost:3000").AllowCredentials();
                     });
             });
             services.AddMediatR(typeof(ActivitiesList.Handler).Assembly);
@@ -125,4 +126,40 @@ public class ChatHub : Hub
 ```
 npm i @microsoft/signalr
 ```
-5. 
+5. Now we will go to our activity store, but instead of calling an API endpoint, we will invoke a method on our server using signalr
+```ts
+    //when the activitiesDetail page is loaded, it will trigger a HubConnection
+    @observable.ref hubConnection: HubConnection | null = null;
+
+    @action createHubConnection = () =>{
+        this.hubConnection = new HubConnectionBuilder()
+            .withUrl('https://localhost:44396/chat', {
+                accessTokenFactory: () => this.rootStore.commonStore.token!
+            })
+            .configureLogging(LogLevel.Information)
+            .build();
+
+        this.hubConnection.start()
+            .then(() => console.log(this.hubConnection!.state))
+            .catch(e => console.log('Error establishing signal r connection', e));
+
+        this.hubConnection.on('ReceiveComment', comment => {
+            runInAction(() =>{
+                this.activity!.comments.push(comment);
+            });
+        })
+    };
+
+    @action stopHubConnection = () =>{
+      this.hubConnection!.stop();
+    };
+
+    @action addComment = async (values: any) =>{
+        values.activityId = this.activity!.id;
+        try {
+            await this.hubConnection!.invoke('SendComment', values)
+        } catch (e) {
+            console.log(e);
+        }
+    };
+```
