@@ -99,7 +99,7 @@ in the ConfigureServices method.
 ```
 3. Below is ouir chathub
 ```cs
-public class ChatHub : Hub
+ public class ChatHub : Hub
     {
         private readonly IMediator _mediator;
         public ChatHub(IMediator mediator)
@@ -107,18 +107,42 @@ public class ChatHub : Hub
             _mediator = mediator;
         }
 
+        //this will act just like our controller endpoint. 
         public async Task SendComment(Create.Command command)
         {
-            var username = Context.User?.Claims?.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+            var username = CurrentUserName();
 
             command.Username = username;
-
-            //below we are simply going to a handler method to create a comment and then return a comment dto, nothing different 
-            //than we normally do.
+             
+             //send to our mediator handler per-normal
             var comment = await _mediator.Send(command);
             
-            //Below we send the DTO to all clients listening.
-            await Clients.All.SendAsync("RecieveComment", comment);
+            //All of our activities belong to the same hub, so we need to use Groups. The Groups
+            //will be defined by the activityId
+            await Clients.Group(command.ActivityId.ToString()).SendAsync("ReceiveComment", comment);
+        }
+
+        //When the connection to the hub is established "UseEffect for activity N", this method will be ran. 
+        //The activityId will be passed in as the groupName. The Individual Context.COnnectionId that each user 
+        //will create, will then be added to the group.
+        public async Task AddToGroup(string groupName)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+            await Clients.Group(groupName).SendAsync("Send", $"{CurrentUserName()} has joined the group.");
+        }
+          
+        //When a user leaves the room, their connectionId will be removed from that ActivityId/Group  
+        public async Task RemoveFromGroup(string groupName)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+
+            await Clients.Group(groupName).SendAsync("Send", $"{CurrentUserName()} has left the group.");
+        }
+
+        private string CurrentUserName()
+        {
+            return Context.User?.Claims?.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
         }
     }
 ```
@@ -131,7 +155,7 @@ npm i @microsoft/signalr
     //when the activitiesDetail page is loaded, it will trigger a HubConnection
     @observable.ref hubConnection: HubConnection | null = null;
 
-    @action createHubConnection = () =>{
+    @action createHubConnection = (activityId: string) =>{
         this.hubConnection = new HubConnectionBuilder()
             .withUrl('https://localhost:44396/chat', {
                 accessTokenFactory: () => this.rootStore.commonStore.token!
@@ -141,17 +165,29 @@ npm i @microsoft/signalr
 
         this.hubConnection.start()
             .then(() => console.log(this.hubConnection!.state))
+            .then(() =>{
+                this.hubConnection!.invoke('AddToGroup', activityId)
+            })
             .catch(e => console.log('Error establishing signal r connection', e));
 
         this.hubConnection.on('ReceiveComment', comment => {
             runInAction(() =>{
                 this.activity!.comments.push(comment);
             });
-        })
+        });
+
+        this.hubConnection.on('Send', message =>{
+            toast.info(message);
+        });
     };
 
     @action stopHubConnection = () =>{
-      this.hubConnection!.stop();
+        this.hubConnection!.invoke('RemoveFromGroup', this.activity!.id)
+            .then(() =>{
+                this.hubConnection!.stop();
+            })
+            .then(() => console.log('Connection Stopped'))
+            .catch(() => console.log('Error stopping hub connection'));
     };
 
     @action addComment = async (values: any) =>{
@@ -162,4 +198,76 @@ npm i @microsoft/signalr
             console.log(e);
         }
     };
+```
+6. Here in our activity chat component
+```ts
+interface IProps {
+    activityId: string
+}
+
+const ActivityDetailedChat: React.FC<IProps> = (props) => {
+    const rootStore = useContext(RootStoreContext);
+    const {activityStore} = rootStore;
+
+    //useEffect will go off and create the hub connection.
+    useEffect(() =>{
+        activityStore.createHubConnection(props.activityId);
+        return() =>{
+            activityStore.stopHubConnection();
+        };
+    }, [activityStore]);
+
+
+    return (
+        <Fragment>
+            <Segment
+                textAlign='center'
+                attached='top'
+                inverted
+                color='teal'
+                style={{ border: 'none' }}
+            >
+                <Header>Chat about this event</Header>
+            </Segment>
+            <Segment attached>
+                <Comment.Group>
+                    {activityStore.activity && activityStore.activity.comments && activityStore.activity!.comments.map((comment) =>(
+                        <Comment key={comment.id}>
+                            <Comment.Avatar src={comment.image || '/assets/user.png'} />
+                            <Comment.Content>
+                                <Comment.Author as='a'>{comment.displayName}</Comment.Author>
+                                <Comment.Metadata>
+                                    <div>{formatDistance(comment.createdAt, new Date())}</div>
+                                </Comment.Metadata>
+                                <Comment.Text>{comment.body}</Comment.Text>
+                            </Comment.Content>
+                        </Comment>
+                    ))}
+                        <FinalForm
+                            onSubmit={activityStore.addComment}
+                            render={(props) =>(
+                                <Form reply onSubmit={() => props.handleSubmit()!.then(() => props.form.reset())}>
+                                    {activityStore.activity!.comments.length > 0 ?
+                                        <Field name={'body'} component={TextAreaInput} rows={3}
+                                               placeholder={'Write Something Beautiful!'}/>
+                                        :
+                                        <Field name={'body'} component={TextAreaInput} rows={3}
+                                               placeholder={'Be the first to write something cool!'}/>
+                                    }
+                                    <Button
+                                        content='Add Reply'
+                                        labelPosition='left'
+                                        icon='edit'
+                                        primary
+                                        type={'submit'}
+                                        disabled={props.invalid || props.pristine}
+                                        loading={props.submitting}
+                                    />
+                                </Form>
+                            )}/>
+                </Comment.Group>
+            </Segment>
+        </Fragment>
+    );
+};
 ```
