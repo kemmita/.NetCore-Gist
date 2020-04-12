@@ -219,3 +219,121 @@
         }
     }
 ```
+8. Now lets return the followings and followers in a fancy way!
+```cs
+   public class Profile
+    {
+        public string DisplayName { get; set; }
+        public string Username { get; set; }
+        public string Image { get; set; }
+        public string Bio { get; set; }
+        // to check if a user is followed by the curent user.
+        [JsonProperty(PropertyName = "following")]
+        public bool IsFollowing { get; set; }
+        public int FollowersCount { get; set; }
+        public int FollowingCount { get; set; }
+        public ICollection<Photo> Photos { get; set; }
+    }
+```
+9. Create ProfileReader
+```cs
+   public interface IProfileReader
+    {
+        Task<Profile> ReadProfile(string username);
+    }
+    
+        public class ProfileReader : IProfileReader
+    {
+        private readonly ApplicationDbContext _db;
+        private readonly IUserAccessor _userAccessor; 
+        public ProfileReader(ApplicationDbContext db, IUserAccessor userAccessor)
+        {
+            _db = db;
+            _userAccessor = userAccessor;
+        }
+        public async Task<Profile> ReadProfile(string username)
+        {
+            var user = await _db.Users.SingleOrDefaultAsync(x => x.UserName == username);
+
+            if (user == null)
+                throw new RestException(HttpStatusCode.NotFound, new { user = "not found" });
+
+            var currentUser = await _db.Users.SingleOrDefaultAsync(x => x.UserName == _userAccessor.GetCurrentUsername());
+
+            var profile = new Profile
+            {
+                Photos = user.Photos,
+                Bio = user.Bio ?? "Bio",
+                DisplayName = user.DisplayName,
+                Image = user.Photos.FirstOrDefault(p => p.IsMainPhoto)?.Url,
+                Username = user.UserName,
+                FollowersCount = user.Followers.Count(),
+                FollowingCount = user.Followings.Count()
+            };
+
+            // chech to see if the current logged in user is following the user
+            if (user.Followers.Any(x => x.ObserverId == currentUser.Id))
+                profile.IsFollowing = true;
+
+            return profile;
+        }
+    }
+```
+9. This handler can handle both fetchgin followers and followings depending on the predicate defined in the query string
+```cs
+    public class List
+    {
+        public class Query : IRequest<List<Profile>> 
+        {
+            public string Username { get; set; }
+            public string Predicate { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Query, List<Profile>>
+        {
+
+            private readonly ApplicationDbContext _db;
+            private readonly IProfileReader _profileReader;
+            public Handler(ApplicationDbContext db, IProfileReader profileReader)
+            {
+                _db = db;
+                _profileReader = profileReader;
+            }
+
+            public async Task<List<Profile>> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var userFollwings = new List<UserFollowing>();
+
+                var profiles = new List<Profile>();
+
+                switch (request.Predicate)
+                {
+                    case "followers":
+                        userFollwings = await _db.Followings.Where(x => 
+                            x.Target.UserName == request.Username).ToListAsync();
+                        foreach (var follower in userFollwings)
+                            profiles.Add(await _profileReader.ReadProfile(follower.Observer.UserName));
+                        break;
+                    case "following":
+                        userFollwings = await _db.Followings.Where(x =>
+                            x.Observer.UserName == request.Username).ToListAsync();
+                        foreach (var follower in userFollwings)
+                            profiles.Add(await _profileReader.ReadProfile(follower.Target.UserName));
+                        break;
+                    default:
+                        break;
+                }
+
+                return profiles;
+            }
+        }
+    }
+```
+10. Now the controller method. Specify followers or follwing in the query like ?predicate=followers
+```cs
+        [HttpGet("{username}")]
+        public async Task<ActionResult<List<Profile>>> GetFollowingData(string username, string predicate) 
+        {
+            return await Mediator.Send(new List.Query {Predicate = predicate, Username = username });
+        }
+```
