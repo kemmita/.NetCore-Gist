@@ -457,3 +457,320 @@ namespace Application.Interfaces
         }
     }
 ```
+19. Adding Facbook login, frist go to "https://developers.facebook.com/" and register a new app. Make sure to grab the app id and secret
+```
+App ID
+############
+App Secret
+##########################
+```
+20. Next we will go to the react project and add a new react component
+```
+npm i react-facebook-login @types/react-facebook-login
+```
+21. First we will make a change to our loginform component.
+```ts
+import React, {useContext} from 'react';
+import {observer} from "mobx-react-lite";
+import {RootStoreContext} from "../../app/stores/rootStore";
+import {Form as FinalForm, Field} from 'react-final-form';
+import {Button, Divider, Form, Header} from 'semantic-ui-react';
+import TextInput from "../../app/common/form/TextInput";
+import {IUserFormValues} from "../../app/Interfaces/user";
+import {FORM_ERROR} from "final-form";
+import {combineValidators, isRequired} from "revalidate";
+import ErrorMessage from "../../app/common/form/ErrorMessage";
+import SocialLogin from "./SocialLogin";
+
+const validate = combineValidators({
+   email: isRequired('email'),
+   password: isRequired('password')
+});
+
+const LoginForm: React.FC = (props) => {
+    const rootStore = useContext(RootStoreContext);
+    const {userStore} = rootStore;
+    return (
+        <FinalForm
+            validate={validate}
+            onSubmit={(values:IUserFormValues) => userStore.login(values).catch(err => ({
+                [FORM_ERROR] : err
+            }))}
+            render={({handleSubmit, submitting, form, submitError, invalid, pristine, dirtySinceLastSubmit}) =>(
+                <Form onSubmit={handleSubmit} error>
+                    <Header content='Login Now!' textAlign='center' style={{color: '#1E6F9D'}} size={'large'}/>
+                    <Field name='email' component={TextInput} placeholder='Email' />
+                    <Field name='password' type='password' component={TextInput} placeholder='Password' />
+                    {submitError && !dirtySinceLastSubmit && <ErrorMessage error={submitError.message} text={'Invalid email or password'}/>}
+                    <br/>
+                    <Button fluid disabled={invalid && !dirtySinceLastSubmit || pristine} style={{backgroundColor: '#1E6F9D', color: 'white'}} content='Login' loading={submitting}/>
+                    // below we add our social login component
+                    <Divider horizontal>Or</Divider>
+                    <SocialLogin fbCallback={userStore.fbLogin}/>
+                </Form>
+            )}
+        />
+    );
+};
+
+export default observer(LoginForm);
+
+```
+22. Below we will create our social login component.
+```ts
+import React from 'react';
+import {observer} from "mobx-react-lite";
+import FacebookLogin from 'react-facebook-login/dist/facebook-login-render-props'
+import {Button, Icon} from "semantic-ui-react";
+
+interface IProps {
+    fbCallback: (response: any) => void;
+}
+
+const ActivityDetails: React.FC<IProps> = (props) => {
+    return (
+        <div>
+            <FacebookLogin
+                appId='534231783929420'
+                fields='name,email,picture'
+                callback={props.fbCallback}
+                render={(renderProps: any) =>(
+                    <Button onClick={renderProps.onClick} type='button' fluid color={'facebook'}>
+                        <Icon name={'facebook'} />
+                        Login Mit Facebook
+                    </Button>
+                )}
+            />
+        </div>
+    );
+};
+
+export default observer(ActivityDetails);
+```
+23. User Store Action
+```ts
+    @action fbLogin = async (response: any) =>{
+        try {
+            const user = await agent.User.fbLogin(response.accessToken);
+            runInAction('Return user after successful login', () =>{
+                this.user = user;
+                this.rootStore.commonStore.setToken(user.token);
+                this.rootStore.modalStore.closeModal();
+                history.push('/activities');
+            });
+        } catch (e) {
+            console.log(e)
+        }
+    };
+```
+24. agent.ts
+```ts
+import axios, { AxiosResponse } from 'axios';
+import { history } from '../..';
+import { toast } from 'react-toastify';
+import {IActivitiesEnvelope, IActivity} from "../Interfaces/activity";
+import {IUser, IUserFormValues} from "../Interfaces/user";
+import {IPhoto, IProfile} from "../Interfaces/profile";
+
+axios.defaults.baseURL = 'https://localhost:44396/api';
+
+axios.interceptors.request.use((config) =>{
+    const token = window.localStorage.getItem('jwt');
+    if (token){
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+}, error => {return Promise.reject(error)});
+
+axios.interceptors.response.use(undefined, error => {
+    if (error.message === 'Network Error' && !error.response) {
+        toast.error('Network error - make sure API is running!')
+    }
+    const {status, data, config} = error.response;
+    if (status === 400 || 404 && config.method === 'get' && data.errors.hasOwnProperty('id')) {
+        history.push('/notfound')
+    }
+    if (status === 500) {
+        toast.error('Server error - check the terminal for more info!')
+    }
+    if (status === 401) {
+        toast.error('Pleas login again to continue browsing!')
+    }
+    throw error;
+});
+
+const responseBody = (response: AxiosResponse) => response.data;
+
+const requests = {
+    post: (url: string, body: {}) => axios.post(url, body).then(responseBody),
+};
+
+const User = {
+  login: (user: IUserFormValues): Promise<IUser> => requests.post('/user/login', user),
+  register: (user: IUserFormValues): Promise<IUser> => requests.post('/user/register', user),
+  fbLogin: (accessToken: string) => requests.post(`/user/External/login`, {accessToken}),
+};
+
+export default {
+    Activities,
+    User
+}
+```
+25. API Controller action
+```cs
+ [Route("api/[controller]")]
+    [ApiController]
+    public class UserController : BaseController
+    {
+        private readonly IMediator _mediator;
+        public UserController(IMediator mediator, IPhotoAccessor photoAccessor)
+        {
+            _mediator = mediator;
+        }
+
+        [AllowAnonymous]
+        [HttpPost("External/login")]
+        public async Task<ActionResult<User>> ExternalLogin(ExternalLogin.Query query)
+        {
+            return await _mediator.Send(query);
+        }
+    }
+```
+26. Handler class
+```cs
+public class ExternalLogin
+    {
+        //specify what param is expected to be passed for this Query
+        public class Query : IRequest<User>
+        {
+            public string AccessToken { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Query, User>
+        {
+            private readonly UserManager<AppUser> _userManager;
+            private readonly IJwtGenerator _jwtGenerator;
+            private readonly IFacebookAccessor _facebookAccessor;
+
+            public Handler(UserManager<AppUser> userManager, IJwtGenerator jwtGenerator, IFacebookAccessor facebookAccessor)
+            {
+                _userManager = userManager;
+                _jwtGenerator = jwtGenerator;
+                _facebookAccessor = facebookAccessor;
+            }
+            //using Query defined above wih a param Id of type Guid, we will locate a single activity in the db associated with the Guid id.
+            public async Task<User> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var userInfo = await _facebookAccessor.FacebookLogin(request.AccessToken);
+
+                if (userInfo == null)
+                    throw new RestException(HttpStatusCode.BadRequest, new { User = "problem validating facebook token." });
+
+                var user = await _userManager.FindByIdAsync(userInfo.Id);
+
+                if (user == null)
+                {
+                    user = new AppUser
+                    {
+                        DisplayName = userInfo.Name,
+                        Id = userInfo.Id,
+                        Email = userInfo.Email,
+                        UserName = "fb_" + userInfo.Id
+                    };
+                    var photo = new Photo
+                    {
+                        Id = "fb_" + userInfo.Id,
+                        IsMainPhoto = true,
+                        Url = userInfo.Picture.Data.Url
+                    };
+
+                    user.Photos.Add(photo);
+
+                    var result = await _userManager.CreateAsync(user);
+
+                    if (!result.Succeeded)
+                        throw new RestException(HttpStatusCode.BadRequest, new { User = "Problem creating new user via facebook" });
+                }
+
+                return new User
+                {
+                    DisplayName = user.DisplayName,
+                    Image = user.Photos.FirstOrDefault(x => x.IsMainPhoto == true)?.Url,
+                    Token = _jwtGenerator.CreateToken(user),
+                    Username = user.UserName
+                };
+            }
+        }
+    }
+```
+27. Below is our FacebookUserInfo object we needed to create in order to parse the data returned correctly.
+```cs
+   public class FacebookUserInfo
+    {
+        public string Email { get; set; }
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public FacebookPictureData Picture { get; set; }
+    }
+
+    public class FacebookPictureData
+    {
+        public FacebookPicture Data { get; set; }
+    }
+
+    public class FacebookPicture
+    {
+        public string Url { get; set; }
+    }
+```
+28. We wil now create our interface and implementer class for said interfcae, ensure to add these via startup class
+```cs
+   public interface IFacebookAccessor
+    {
+        Task<FacebookUserInfo> FacebookLogin(string accessToken);
+    }
+```
+29. FacebookAccessor class
+```cs
+    public class FacebookAccessor : IFacebookAccessor
+    {
+        private readonly HttpClient _httpClient;
+
+        private readonly IOptions<FacebookAppSettings> _config;
+        public FacebookAccessor(IOptions<FacebookAppSettings> config)
+        {
+            _config = config;
+
+            _httpClient = new HttpClient
+            {
+                BaseAddress = new System.Uri("https://graph.facebook.com/")
+            };
+
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        }
+
+        public async Task<FacebookUserInfo> FacebookLogin(string accessToken)
+        {
+            // verify token is valid using facebook
+            var verifiedToen = await _httpClient.GetAsync($"debug_token?input_token={accessToken}&access_token={_config.Value.AppId}|{_config.Value.AppSecret}");
+
+            if (!verifiedToen.IsSuccessStatusCode)
+                return null;
+
+            return await GetAsync<FacebookUserInfo>(accessToken, "me", "fields=name,email,picture.width(100).height(100)");
+        }
+
+        private async Task<T> GetAsync<T>(string accessToken, string endpoint, string args)
+        {
+            // Go and get users infor from facebook 
+            var response = await _httpClient.GetAsync($"{endpoint}?access_token={accessToken}&{args}");
+
+            if (!response.IsSuccessStatusCode)
+                return default(T);
+
+            var result = await response.Content.ReadAsStringAsync();
+
+            return JsonConvert.DeserializeObject<T>(result);
+        }
+    }
+```
