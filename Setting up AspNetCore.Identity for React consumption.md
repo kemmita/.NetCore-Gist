@@ -774,3 +774,219 @@ public class ExternalLogin
         }
     }
 ```
+30. Now lets add email confirmation for our registration, you will need to create an account with MailJet before doing this.
+after you setup an account add the nuget package to the respected libs and api.
+```
+Mailjet.Api
+```
+31. Add a new section to our appsetings.json file
+```json
+  "Smtp": {
+    "Host": "in-v3.mailjet.com",
+    "Username": "dabfbb37232876666de959a659de58cc",
+    "Password": "d61aa4bd876fe7d53b756e4638975477",
+    "Port": 587
+  },
+```
+32. Create a new object to match the props above, we are going to strongly type this.
+```cs
+    public class SmtpOptions
+    {
+        public string Host { get; set; }
+        public string Username { get; set; }
+        public string Password { get; set; }
+        public int Port { get; set; }
+    }
+```
+33. Lets now create our emnail sender class
+```cs
+  public interface IEmailSender
+    {
+        Task SendEmailAsync(string from, string to, string subject, string message);
+    }
+    
+      public class EmailSender : IEmailSender
+    {
+        private readonly IOptions<SmtpOptions> _config;
+
+        public EmailSender(IOptions<SmtpOptions> config)
+        {
+            _config = config;
+        }
+
+        public async Task SendEmailAsync(string from, string to, string subject, string message)
+        {
+            var mailMessage = new MailMessage(from, to, subject, message);
+
+            using (var client = new SmtpClient(_config.Value.Host, _config.Value.Port)
+            {
+                Credentials = new NetworkCredential(_config.Value.Username, _config.Value.Password)
+            })
+            {
+                await client.SendMailAsync(mailMessage);
+            }
+        }
+    }
+  
+```
+34. Below I notate how I modified the register class
+```cs
+       public class Handler : IRequestHandler<Command, User>
+        {
+            private readonly ApplicationDbContext _db;
+            private readonly UserManager<AppUser> _userManager;
+            private readonly IJwtGenerator _jwtGenerator;
+            // add the email sender
+            private readonly IEmailSender _emailSender;
+            public Handler(ApplicationDbContext db, UserManager<AppUser> userManager, IJwtGenerator jwtGenerator, IEmailSender emailSender)
+            {
+                _db = db;
+                _userManager = userManager;
+                _jwtGenerator = jwtGenerator;
+                _emailSender = emailSender;
+            }
+
+            public async Task<User> Handle(Command request, CancellationToken cancellationToken)
+            {
+                if (await _db.Users.AnyAsync(u => u.Email == request.Email))
+                {
+                    throw new RestException(HttpStatusCode.BadRequest, new {Email = "Email Already Exists"});
+                }
+
+                if (await _db.Users.AnyAsync(u => u.UserName == request.Username))
+                {
+                    throw new RestException(HttpStatusCode.BadRequest, new { Username = "Username Already Exists" });
+                }
+
+                var user = new AppUser
+                {
+                    DisplayName = request.DisplayName,
+                    Email = request.Email,
+                    UserName = request.Username
+                };
+
+                var results = await _userManager.CreateAsync(user, request.Password);
+
+                if (results.Succeeded)
+                {
+                    // fetch the user we just created
+                    user = await _userManager.FindByNameAsync(user.UserName);
+                    // create a email token
+                    var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                    // create the link for the email
+                    var confirmatrionLink = new Uri($"https://localhost:44396/api/user/confirmEmail?userId={user.Id}&token={HttpUtility.UrlEncode(token)}");
+                    // send the email
+                    await _emailSender.SendEmailAsync("russellkemmitdeveloper@gmail.com", user.Email, "Kemmittech Email Confirmation", $"Please confirm your account, by selecting this link: {confirmatrionLink}");
+
+                    return new User
+                    {
+                        DisplayName = user.DisplayName,
+                        Token = _jwtGenerator.CreateToken(user),
+                        Username = user.UserName,
+                        Image = user.Photos.FirstOrDefault(p => p.IsMainPhoto)?.Url
+                     };                                                                                                                                                                                                                                                       
+                }
+
+                throw new Exception("Problem registering user.");
+            }
+        }
+```
+35. Below I notate how I modified the login class
+```cs
+            public async Task<User> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var user = await _userManager.FindByEmailAsync(request.Email);
+
+                if (user == null)
+                {
+                    throw new RestException(HttpStatusCode.Unauthorized);
+                }
+
+                var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
+                // check if the email is confirmed
+                var emailConfirmed = await _userManager.IsEmailConfirmedAsync(user);
+                
+                // if the email is not confirmed throw an exception
+                if (!emailConfirmed)
+                    throw new RestException(HttpStatusCode.Unauthorized, new { Email = "You must confirm your email" });
+
+                if (result.Succeeded)
+                {
+                    // Return Token
+                    return new User
+                    {
+                        DisplayName = user.DisplayName,
+                        Image = user.Photos.FirstOrDefault(x => x.IsMainPhoto == true)?.Url,
+                        Token = _jwtGenerator.CreateToken(user),
+                        Username = user.UserName
+                    };
+                }
+                else
+                {
+                    throw new RestException(HttpStatusCode.Unauthorized);
+                }
+            }
+```
+36. In the user controller, we will create a new action that will act as the endpoint hit when the user selects the 
+confirm link in the email. You must include the [FromQuery] in order to get the props.
+```cs
+        [AllowAnonymous]
+        [HttpGet("confirmEmail")]
+        public async Task<ActionResult<Unit>> ConfirmEmail([FromQuery]ConfirmEmail.Command command)
+        {
+             // go and confirm the email   
+             await _mediator.Send(command);
+            // redirect the user to an address of your choosing.
+            return Redirect("http://localhost:3000");
+        }
+```
+37.Below is the confirm email address
+```cs
+    public class ConfirmEmail
+    {
+        public class Command : IRequest
+        {
+            public string Token { get; set; }
+            public string UserId { get; set; }
+        }
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly ApplicationDbContext _db;
+            private readonly UserManager<AppUser> _userManager;
+            public Handler(ApplicationDbContext db, UserManager<AppUser> userManager)
+            {
+                _db = db;
+                _userManager = userManager;
+            }
+
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                var user = await _userManager.FindByIdAsync(request.UserId);
+
+                if (user == null)
+                    throw new RestException(HttpStatusCode.NotFound, new { User = "User Not Found" });
+                
+                var result = await _userManager.ConfirmEmailAsync(user, request.Token);
+
+                if (result.Succeeded)
+                    return Unit.Value;
+
+                throw new Exception("Problem registering user.");
+            }
+        }
+}
+```
+38. Below is the changes I made to the startup class
+```cs
+            // needed to append AddDefaultTokenProviders()
+            var builder = services.AddIdentityCore<AppUser>().AddDefaultTokenProviders();
+            // added this section to require the email confirmation "1"
+            services.Configure<IdentityOptions>(options =>
+            {
+                options.SignIn.RequireConfirmedEmail = true;
+            });
+            // added our new email sender class and strongly typed smtp options 
+            services.AddScoped<IEmailSender, EmailSender>();
+            services.Configure<SmtpOptions>(Configuration.GetSection("Smtp"));
+```
+39. If you want to see the edits made for the front end visit https://github.com/kemmita/React-Gist/blob/master/Consuming%20ASP%20Identity.md 
