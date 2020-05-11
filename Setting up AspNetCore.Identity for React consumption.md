@@ -65,10 +65,12 @@ later below
                     });
             });
             services.AddMediatR(typeof(ActivitiesList.Handler).Assembly);
+            // 3.1 change AddMVC to AddControllers, the rest is the same
             services.AddMvc(options =>
             {
                 var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
                 options.Filters.Add(new AuthorizeFilter(policy));
+                //in 3.1 may need to remove SetCompatibilityVersion before AddFluentValidation
             }).SetCompatibilityVersion(CompatibilityVersion.Version_2_2).AddFluentValidation(cfg =>
                 {
                     cfg.RegisterValidatorsFromAssemblyContaining<CreateActivity>();
@@ -79,6 +81,7 @@ later below
             identityBuilder.AddSignInManager<SignInManager<AppUser>>();
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Super Secret Key"));
+            // will need to install JwtBearerDefaults nugget to this api proj for 3.1
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -93,7 +96,7 @@ later below
             services.AddScoped<IUserAccessor, UserAccessor>();
         }
         
-        
+        //2.2
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             app.UseMiddleware<ErrorHandlingMiddleware>();
@@ -111,6 +114,30 @@ later below
             app.UseCors("CorsPolicy");
             app.UseAuthentication();
             app.UseMvc();
+        }
+        
+        //3.1
+                public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            app.UseMiddleware<ErrorHandlingMiddleware>();
+            
+            //using microsoft.extensions.hsoting
+            if (env.IsDevelopment())
+            {
+                //app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                //app.UseHsts();
+            }
+            app.UseRouting
+            app.UseCors("CorsPolicy");
+            app.UseAuthentication();
+            app.UseAuthorization(); 
+            
+            app.useendpoints
+            
         }
 ```
 6. We will now seed our database with test users. This will be done in the persistence project, file Seed.cs 
