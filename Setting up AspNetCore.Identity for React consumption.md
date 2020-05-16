@@ -79,8 +79,8 @@ later below
             var identityBuilder = new IdentityBuilder(builder.UserType, builder.Services);
             identityBuilder.AddEntityFrameworkStores<ApplicationDbContext>();
             identityBuilder.AddSignInManager<SignInManager<AppUser>>();
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Super Secret Key"));
+            // The key here must match the key we define in the JwtGenerator class
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("###########"));
             // will need to install JwtBearerDefaults nugget to this api proj for 3.1
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
             {
@@ -213,8 +213,9 @@ and since the static method is async and the main method of the progrma is not, 
             {
                 new Claim(JwtRegisteredClaimNames.NameId, user.UserName)
             };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Super Secret Key"));
+            
+            // this key must match the key in the startup class
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("########"));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
 
             var tokenDescriptor = new SecurityTokenDescriptor
