@@ -811,8 +811,8 @@ Mailjet.Api
 ```json
   "Smtp": {
     "Host": "in-v3.mailjet.com",
-    "Username": "dabfbb37232876666de959a659de58cc",
-    "Password": "d61aa4bd876fe7d53b756e4638975477",
+    "Username": "###############",
+    "Password": "###########",
     "Port": 587
   },
 ```
